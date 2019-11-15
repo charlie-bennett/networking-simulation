@@ -317,12 +317,14 @@ int udp_listen()
 
 int main()
 {
-	if (tcp(false)) {} //whoopss
-	if (udp_send(buf, SERVERA)) {} //whoops
-	if (udp_listen()) {} //whoops
-	if (udp_send(buf, SERVERB)) {} //whoops
-	if (udp_listen()) {} //whoops
-
+	while (true)
+	{
+		if (tcp(false)) {} //whoopss
+		if (udp_send(buf, SERVERA)) {} //whoops
+		if (udp_listen()) {} //whoops
+		if (udp_send(buf, SERVERB)) {} //whoops
+		if (udp_listen()) {} //whoops
+	}
 
 
 	return 0;

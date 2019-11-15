@@ -328,25 +328,24 @@ int udp_send(char* message, char* port) //please dont forget terminating char
 
 int main()
 {
-	request_params* incoming_request = new request_params;
-	udp_listen(incoming_request, true);
-	//recieved data
-	cout << endl << "The Server B has recieved data for calculation:" << cout << endl;
-	printf("*Propagation speed: %f km / s\n", incoming_request->prop_speed);
-	printf("*Transmiission speed: %f Bytes / s\n", incoming_request->trans_speed);
-	for (int i = 0; i < incoming_request->num_v; i++)
+	while (true)
 	{
-		printf("*Path length for destination %d : %d\n", incoming_request->distances[0][i],
-		       incoming_request->distances[1][i]);
+		request_params* incoming_request = new request_params;
+		udp_listen(incoming_request, true); //is this blocking?
+		//recieved data
+		cout << endl << "The Server B has recieved data for calculation:" << cout << endl;
+		printf("*Propagation speed: %f km / s\n", incoming_request->prop_speed);
+		printf("*Transmiission speed: %f Bytes / s\n", incoming_request->trans_speed);
+		for (int i = 0; i < incoming_request->num_v; i++)
+		{
+			printf("*Path length for destination %d : %d\n", incoming_request->distances[0][i],
+			       incoming_request->distances[1][i]);
+		}
+
+		Request* processed_request = new Request(incoming_request);
+		processed_request->print();
+		if (udp_send(processed_request->response, AWS)) {} //whoops
+		cout << endl << "The Server B has finished sending the output to AWS" << endl;
 	}
-
-	Request* processed_request = new Request(incoming_request);
-	processed_request->print();
-	if (udp_send(processed_request->response, AWS)) {} //whoops
-	cout << endl << "The Server B has finished sending the output to AWS" << endl;
-
-
-
-
 
 }
