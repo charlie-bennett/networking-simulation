@@ -190,13 +190,15 @@ int udp_listen(request_params* incoming_request, bool boot_up)
 			perror("listener: socket");
 			continue;
 		}
-
+//TODO
+		/*
 		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
 		{
 			close(sockfd);
 			perror("listener: bind");
 			continue;
 		}
+		*/
 
 		break;
 	}
@@ -333,7 +335,7 @@ int main()
 		request_params* incoming_request = new request_params;
 		udp_listen(incoming_request, true); //is this blocking?
 		//recieved data
-		cout << endl << "The Server B has recieved data for calculation:" << cout << endl;
+		cout << endl << "The Server B has recieved data for calculation:" << endl;
 		printf("*Propagation speed: %f km / s\n", incoming_request->prop_speed);
 		printf("*Transmiission speed: %f Bytes / s\n", incoming_request->trans_speed);
 		for (int i = 0; i < incoming_request->num_v; i++)

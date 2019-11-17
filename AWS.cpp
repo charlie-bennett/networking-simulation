@@ -93,13 +93,15 @@ int tcp(bool rxtx)
 			perror("setsockopt");
 			exit(1);
 		}
-
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-		{
-			close(sockfd);
-			perror("server: bind");
-			continue;
-		}
+		//TODO
+		/*
+				if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+				{
+					close(sockfd);
+					perror("server: bind");
+					continue;
+				}
+				*/
 
 		break;
 	}
@@ -269,13 +271,15 @@ int udp_listen()
 			perror("listener: socket");
 			continue;
 		}
-
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-		{
-			close(sockfd);
-			perror("listener: bind");
-			continue;
-		}
+		//TODO
+		/*
+				if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+				{
+					close(sockfd);
+					perror("listener: bind");
+					continue;
+				}
+				*/
 
 		break;
 	}

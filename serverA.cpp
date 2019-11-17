@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <cmath>
 #define MYPORT "21095"
 #define AWS "23095"   // the port users will be connecting to
 #define MAXBUFLEN 100
@@ -24,6 +25,17 @@ using namespace std;
 //the following is from Beej guid
 //************
 // get sockaddr, IPv4 or IPv6:
+int string_to_int(string me)
+{
+	char* output = new char[me.size()];
+	for ( int i = 0; i < me.size(); i++)
+	{
+		output[i] =  me[i];
+	}
+
+	return atoi(output);
+}
+
 void* get_in_addr(struct sockaddr* sa)
 {
 	if (sa->sa_family == AF_INET)
@@ -37,8 +49,8 @@ void* get_in_addr(struct sockaddr* sa)
 
 struct Request
 {
-	char mapID;
-	int src;
+	string mapID;
+	string src;
 	int file_size;
 };
 
@@ -135,15 +147,19 @@ int udp_listen(Request* incoming_request, bool boot_up)
 			continue;
 		}
 
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-		{
-			close(sockfd);
-			perror("listener: bind");
-			continue;
-		}
+//TODO
+		/*
+				if ((bind(sockfd, p->ai_addr, p->ai_paddrlen) == -1))
+				{
+					close(sockfd);
+					perror("listener: bind");
+					continue;
+				}
+				*/
 
 		break;
 	}
+
 
 	if (p == NULL)
 	{
@@ -154,7 +170,7 @@ int udp_listen(Request* incoming_request, bool boot_up)
 
 	if (boot_up)
 	{
-		printf("The Server A is up and running using UDP on port %d.", MYPORT);
+		printf("The Server A is up and running using UDP on port %s.", MYPORT);
 	}
 	else {} //do something here
 
@@ -177,11 +193,31 @@ int udp_listen(Request* incoming_request, bool boot_up)
 
 	close(sockfd);
 	//********************************
-	incoming_request->mapID = buf[0];
-	incoming_request->src = atoi(buff + 1);
+
+	vector<string> inputs(2); //hold first two entries
+	int trail = 0;
+	int place = 0;
+	string interm;
+
 	for (int i = 0; i < numbytes; i++)
-		if (buff[i] == ' ') break;
-	incoming_requestt->file_size = atoi(buff + i);
+	{
+		if (buf[i] == ' ')
+		{
+			inputs[place] = interm;
+			if (place == 2) break;
+			place++;
+			interm = "";
+		}
+		else
+		{
+			interm += buf[i];
+		}
+
+	}
+	incoming_request->mapID = inputs[0];
+	incoming_request->src = inputs[1];
+	incoming_request->file_size = string_to_int(interm);
+	//string.inputs[3] = string_to_int(interm);
 
 	/*
 		char source[256];
@@ -215,7 +251,7 @@ int udp_listen(Request* incoming_request, bool boot_up)
 class map_info
 {
 public:
-	map<int, int> aliases;
+	map<string, int> aliases;
 	void dijkstra(int** graph, int* output, int numVert, int src)
 	{
 		//initialize
@@ -263,7 +299,7 @@ public:
 		delete [] inPath;
 		return;
 	}
-	vector<int> get_dijkstra(int src)
+	vector<int> get_dijkstra(string src)
 	{
 		int src_prime = aliases[src];
 		vector<int> output(num_v);
@@ -306,17 +342,44 @@ public:
 
 
 		//test
-		int to, from, cost;
-		vector<vector<int> > nodes;
+		string to, from;
+		int cost;
+		vector<vector<string> > nodes;
 		string dummy;
 		int running = 0;
-		for (vector<string>::iterator it = buffer.begin() + 3; it != buffer.end(); ++it)
+		for (vector<string>::iterator line = buffer.begin() + 3; line != buffer.end(); ++line)
 		{
 			// to from cost (0, 2, 4)
+			int loc = 0;
+			string interm;
+			nodes.push_back(vector<string>(3));
+			for (int i = 0; i < line->size(); i++)
+			{
+
+				if ((line[i] == " "))
+				{
+					if (line[i] != " ") i++;
+					nodes.back()[loc] = interm;
+					if (loc == 2) break;
+					interm = "";
+					loc++;
+
+				}
+				else
+				{
+					interm += line[i];
+				}
+
+			}
+			nodes.back()[2] = interm;
+
+
+			/*
 			dummy = *it;
 			to = atoi(&dummy[0]);
 			from = atoi(&dummy[2]);
 			cost = atoi(&dummy[4]);
+
 			if (aliases.find(to) == aliases.end())
 			{
 				aliases[to] = running;
@@ -331,31 +394,52 @@ public:
 			from = aliases[from];
 			num_v = (to > num_v) ? to : num_v;
 			num_v = (from > num_v) ? from : num_v;
-			nodes.push_back(vector<int>(3));
+
 			nodes[nodes.size() - 1][0] = to;
 			nodes[nodes.size() - 1][1] = from;
 			nodes[nodes.size() - 1][2] = cost;
+			*/
+
 
 		}
-		num_v++;
+		for (auto it : nodes)
+		{
+			to = (it)[0];
+			from = it[1];
+			cost = string_to_int(it[2]);
+			if (aliases.find(to) == aliases.end())
+			{
+				aliases.insert({to, running});
+				running++;
+			}
+			if (aliases.find(from) == aliases.end())
+			{
+				aliases.insert({from, running});
+				running++;
+			}
+			//graph[to][from] = cost;
+			graph[aliases[to]][aliases[from]] = cost;
+		}
+
+		int num_v = running + 1;
 		graph = new int* [num_v];
 		for (int i = 0; i < num_v; i++)
 		{
 			graph[i] = new int[num_v];
 			for (int j = 0; j < num_v; j++) graph[i][j] = 0;
 		}
-		vector<int> dum;
-		for (vector<vector<int> >::iterator it = nodes.begin(); it != nodes.end(); ++it)
+		/*
+		vector<string> dum;
+
+		for (int i = 0; i < nodes.size(); i++)
 		{
-			dum = *it;
-
-			to = dum[0];
-			from = dum[1];
-			cost = dum[2];
-			graph[to][from] = cost;
-			graph[from][to] = cost;
-
+			to = nodes[i][0];
+			from = nodes[i][1];
+			cost = string_to_int(nodes[i][2]);
 		}
+		*/
+
+
 		cout << endl << "num_v = " << num_v << endl;
 		for (int i = 0; i < num_v; i++)
 		{
@@ -419,103 +503,104 @@ vector<map_info*> read_file(string file_name)
 
 int main()
 {
-	while (true)
+
+	//udp_send("test");
+	vector<char*> Responses;
+	vector<map_info*> maps = read_file("map.txt");
+	//maps[0]->get_dijkstra(0);
+	map<string, map_info*> map_of_maps;
+	vector<vector<int> > shortest_paths;
+
+	//construct map
+	printf("\nThe Server A has constructed a list of %d maps:\n", maps.size());
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl << "Map ID Num Vertices Num Edges" << endl;
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl;
+	for (vector<map_info*>::iterator it = maps.begin(); it != maps.end(); ++it)
 	{
-		//udp_send("test");
-		vector<char*> Responses;
-		vector<map_info*> maps = read_file("map.txt");
-		//maps[0]->get_dijkstra(0);
-		map<char, map_info*> map_of_maps;
-		vector<vector<int> > shortest_paths;
 
-		//construct map
-		printf("\nThe Server A has constructed a list of %d maps:\n", maps.size());
-		for (int i = 0; i < 45; i++) cout << "-";
-		cout << endl << "Map ID Num Vertices Num Edges" << endl;
-		for (int i = 0; i < 45; i++) cout << "-";
+		map_of_maps[to_string((*it)->get_mapID())] = (*it);
+		cout << setw(strlen("Map ID")) << (*it)->get_mapID();
+		cout << setw(strlen("Num Vertices")) << (*it)->get_v();
+		cout << setw(strlen("Num Edges")) << (*it)->get_e();
 		cout << endl;
-		for (vector<map_info*>::iterator it = maps.begin(); it != maps.end(); ++it)
-		{
-
-			map_of_maps[(*it)->get_mapID()] = (*it);
-			cout << setw(strlen("Map ID")) << (*it)->get_mapID();
-			cout << setw(strlen("Num Vertices")) << (*it)->get_v();
-			cout << setw(strlen("Num Edges")) << (*it)->get_e();
-			cout << endl;
-		}
-		for (int i = 0; i < 45; i++) cout << "-";
-		cout << endl;
-
-		Request* incoming_request = new Request;
-		//while loop here
-		string response;
-		response = "";
-		//listen
-		if (udp_listen(incoming_request), true)
-		{
-			//whoops we got an error
-		}
-
-
-
-		char* message = "The Server A has recieved input for finding the shortest paths: starting vertext %d of map %c.\n";
-		printf(message, incoming_request->src, incoming_request->mapID);
-		//Populate first values of response
-		response += to_string(incoming_request->file_size);
-		response += "||";
-		response += map_of_maps[incoming_request->mapID]->get_mapID();
-		response += "||";
-		response += to_string(map_of_maps[incoming_request->mapID]->get_v());
-		response += "||";
-		response += to_string(map_of_maps[incoming_request->mapID]->get_e());
-		response += "||";
-		response += to_string(map_of_maps[incoming_request->mapID]->get_prop_speed());
-		response += "||";
-		response += to_string(map_of_maps[incoming_request->mapID]->get_trans_speed());
-		response += "||";
-
-
-
-		//print shortest path
-		cout << "The Server A has identified the following shortest paths:" << endl;
-		cout << endl;
-		for (int i = 0; i < 45; i++) cout << "-";
-		cout << endl;
-		cout << "Destination Min Length" << endl;
-		for (int i = 0; i < 45; i++) cout << "-";
-		cout << endl;
-		shortest_paths.push_back(map_of_maps[incoming_request->mapID]->get_dijkstra(incoming_request->src));
-		for (std::pair<vector<int>::iterator, map<int, int>::iterator>
-		        it(shortest_paths.back().begin(),
-		           map_of_maps[incoming_request->mapID]->aliases.begin());
-		        it.first != shortest_paths.back().end();
-		        ++it.first, ++it.second)
-		{
-			cout << (it.second->first) << " " << (*it.first) << endl;
-			response += to_string(it.second->first);
-			response += "||";
-			response += to_string(*it.first);
-			response += "||";
-		}
-
-
-		for (int i = 0; i < 45; i++) cout << "-";
-		cout << endl;
-
-		//send
-		Responses.push_back(new char[response.size()]);
-		for (int i = 0; i < response.size(); i++)
-		{
-			Responses[Responses.size() - 1][i] = response[i];
-		}
-
-		//wait to send
-		for (int i = 0; i < 100000000; i++) {}
-		udp_send(Responses.back());
-
-		delete [] Responses.back();
-
 	}
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl;
+
+	Request* incoming_request = new Request;
+	//while loop here
+	string response;
+	response = "";
+	//listen
+	if (udp_listen(incoming_request, true))
+	{
+		//whoops we got an error
+	}
+
+
+
+	char* message = "The Server A has recieved input for finding the shortest paths: starting vertext %d of map %c.\n";
+	//printf(message, incoming_request->src, incoming_request->mapID);
+	printf(message);
+	cout << incoming_request->src << " " << incoming_request->mapID;
+	//Populate first values of response
+	response += to_string(incoming_request->file_size);
+	response += "||";
+	response += map_of_maps[incoming_request->mapID]->get_mapID();
+	response += "||";
+	response += to_string(map_of_maps[incoming_request->mapID]->get_v());
+	response += "||";
+	response += to_string(map_of_maps[incoming_request->mapID]->get_e());
+	response += "||";
+	response += to_string(map_of_maps[incoming_request->mapID]->get_prop_speed());
+	response += "||";
+	response += to_string(map_of_maps[incoming_request->mapID]->get_trans_speed());
+	response += "||";
+
+
+
+	//print shortest path
+	cout << "The Server A has identified the following shortest paths:" << endl;
+	cout << endl;
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl;
+	cout << "Destination Min Length" << endl;
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl;
+	shortest_paths.push_back(map_of_maps[incoming_request->mapID]->get_dijkstra(string(incoming_request->src)));
+	for (std::pair<vector<int>::iterator, map<string, int>::iterator>
+	        it(shortest_paths.back().begin(),
+	           map_of_maps[incoming_request->mapID]->aliases.begin());
+	        it.first != shortest_paths.back().end();
+	        ++it.first, ++it.second)
+	{
+		cout << (it.second->first) << " " << (*it.first) << endl;
+		response += string(it.second->first);
+		response += "||";
+		response += to_string(*it.first);
+		response += "||";
+	}
+
+
+	for (int i = 0; i < 45; i++) cout << "-";
+	cout << endl;
+
+	//send
+	Responses.push_back(new char[response.size()]);
+	for (int i = 0; i < response.size(); i++)
+	{
+		Responses[Responses.size() - 1][i] = response[i];
+	}
+
+	//wait to send
+	for (int i = 0; i < 100000000; i++) {}
+	udp_send(Responses.back());
+
+	delete [] Responses.back();
+
+
 
 
 
