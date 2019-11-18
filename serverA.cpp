@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <tuple>
 #include <cmath>
 #define MYPORT "21095"
 #define AWS "23095"   // the port users will be connecting to
@@ -309,7 +310,7 @@ public:
 		delete [] shortest_paths;
 		return output;
 	}
-	char get_mapID() {return this->mapID;}
+	string get_mapID() {return this->mapID;}
 	int get_v() {return this->num_v;}
 	int get_e() {return this->num_e;}
 	double get_prop_speed() {return this->prop_speed;}
@@ -332,38 +333,54 @@ public:
 	*/
 	//map<int, int>* get_alias() {return &aliases;}
 
-	map_info(vector<string> buffer): buffer(buffer)
+	map_info(vector<string> buffer, string mapID): buffer(buffer), mapID(mapID)
 	{
 		this->num_v = 0;
-		this->mapID = buffer[0][0];
+		//this->mapID = buffer[0][0];
 		this->prop_speed = (double) stoi(buffer[1]);
 		this->trans_speed = (double) stoi(buffer[2]);
 		this->num_e = buffer.size() - 3;
 
-
 		//test
 		string to, from;
 		int cost;
-		vector<vector<string> > nodes;
+		//vector<vector<string> > nodes;
 		string dummy;
 		int running = 0;
-		for (vector<string>::iterator line = buffer.begin() + 3; line != buffer.end(); ++line)
+		vector<tuple<string, string, int>> nodes; //to from cost
+		for (auto line : buffer)
 		{
+
 			// to from cost (0, 2, 4)
 			int loc = 0;
 			string interm;
-			nodes.push_back(vector<string>(3));
-			for (int i = 0; i < line->size(); i++)
+
+			tuple<string, string, int> node;
+
+			for (int i = 0; i < line.size(); i++)
 			{
-
-				if ((line[i] == " "))
+				if (line[i] == ' ')
 				{
-					if (line[i] != " ") i++;
-					nodes.back()[loc] = interm;
-					if (loc == 2) break;
-					interm = "";
-					loc++;
+					if (loc == 0)
+					{
 
+
+						to = interm;
+						get<0>(node) = interm;
+						interm = "";
+
+						loc++;
+					}
+					else if (loc == 1)
+					{
+						from = interm;
+						get<1>(node) = interm;
+						interm = "";
+
+						loc++;
+
+					}
+					else if (loc == 3) break;
 				}
 				else
 				{
@@ -371,42 +388,9 @@ public:
 				}
 
 			}
-			nodes.back()[2] = interm;
-
-
-			/*
-			dummy = *it;
-			to = atoi(&dummy[0]);
-			from = atoi(&dummy[2]);
-			cost = atoi(&dummy[4]);
-
-			if (aliases.find(to) == aliases.end())
-			{
-				aliases[to] = running;
-				running++;
-			}
-			if (aliases.find(from) == aliases.end())
-			{
-				aliases[from] = running;
-				running++;
-			}
-			to = aliases[to];
-			from = aliases[from];
-			num_v = (to > num_v) ? to : num_v;
-			num_v = (from > num_v) ? from : num_v;
-
-			nodes[nodes.size() - 1][0] = to;
-			nodes[nodes.size() - 1][1] = from;
-			nodes[nodes.size() - 1][2] = cost;
-			*/
-
-
-		}
-		for (auto it : nodes)
-		{
-			to = (it)[0];
-			from = it[1];
-			cost = string_to_int(it[2]);
+			get<2>(node) = string_to_int(interm);
+			cost = string_to_int(interm);
+			nodes.push_back(node);
 			if (aliases.find(to) == aliases.end())
 			{
 				aliases.insert({to, running});
@@ -417,17 +401,27 @@ public:
 				aliases.insert({from, running});
 				running++;
 			}
-			//graph[to][from] = cost;
-			graph[aliases[to]][aliases[from]] = cost;
 		}
-
-		int num_v = running + 1;
+		this->num_v = running + 1;
 		graph = new int* [num_v];
 		for (int i = 0; i < num_v; i++)
 		{
 			graph[i] = new int[num_v];
 			for (int j = 0; j < num_v; j++) graph[i][j] = 0;
 		}
+		cout << "size of nodes " << nodes.size() << endl;
+
+		for (auto node : nodes)
+		{
+			//cout << " to " << get<0>(node) << " from " << get<1>(node) << " cost " << get<2>(node) << endl;
+			to = get<0>(node);
+			from = get<1>(node);
+			cost = get<2>(node);
+			graph[aliases[to]][aliases[from]] = cost;
+		}
+
+
+
 		/*
 		vector<string> dum;
 
@@ -438,9 +432,6 @@ public:
 			cost = string_to_int(nodes[i][2]);
 		}
 		*/
-
-
-		cout << endl << "num_v = " << num_v << endl;
 		for (int i = 0; i < num_v; i++)
 		{
 			for (int j = 0; j < num_v; j++) cout << " " << graph[i][j];
@@ -455,7 +446,7 @@ private:
 	int** graph;
 	double prop_speed;
 	double trans_speed;
-	char mapID;
+	string mapID;
 	vector<string> buffer;
 	int num_e;
 
@@ -487,10 +478,12 @@ vector<map_info*> read_file(string file_name)
 		        || ( i == (buffer.size() - 1) ) ) && begin_value != i)
 		{
 			//new map
-			first = buffer.begin() + begin_value;
+			first = buffer.begin() + begin_value + 3; //see if this doesntt cause problems
 			last = buffer.begin() + i;
 			map_dumps.push_back(vector<string>(first, last));
-			maps.push_back(new map_info(map_dumps[map_dumps.size() - 1]));
+			//get map ID
+
+			maps.push_back(new map_info(map_dumps[map_dumps.size() - 1], buffer[begin_value]));
 			begin_value = i;
 		}
 	}
@@ -498,7 +491,6 @@ vector<map_info*> read_file(string file_name)
 	mapFile.close();
 	return maps;
 }
-
 
 
 int main()
@@ -512,7 +504,7 @@ int main()
 	vector<vector<int> > shortest_paths;
 
 	//construct map
-	printf("\nThe Server A has constructed a list of %d maps:\n", maps.size());
+	printf("\nThe Server A has constructed a list of %lu maps:\n", maps.size());
 	for (int i = 0; i < 45; i++) cout << "-";
 	cout << endl << "Map ID Num Vertices Num Edges" << endl;
 	for (int i = 0; i < 45; i++) cout << "-";
@@ -520,7 +512,7 @@ int main()
 	for (vector<map_info*>::iterator it = maps.begin(); it != maps.end(); ++it)
 	{
 
-		map_of_maps[to_string((*it)->get_mapID())] = (*it);
+		map_of_maps[(*it)->get_mapID()] = (*it);
 		cout << setw(strlen("Map ID")) << (*it)->get_mapID();
 		cout << setw(strlen("Num Vertices")) << (*it)->get_v();
 		cout << setw(strlen("Num Edges")) << (*it)->get_e();
@@ -606,3 +598,5 @@ int main()
 
 	return 0;
 }
+
+//TODO garbage collection
