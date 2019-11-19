@@ -16,16 +16,27 @@
 #include <netdb.h>
 #include <tuple>
 #include <cmath>
+#include <sstream>
 #define MYPORT "21095"
 #define AWS "23095"   // the port users will be connecting to
 #define MAXBUFLEN 100
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
+#define PRECISION 3
 
 //the following is from Beej guid
 //************
 // get sockaddr, IPv4 or IPv6:
+string double_to_string(double input)
+{
+	ostringstream stream;
+	stream << std::fixed;
+	stream << setprecision(PRECISION);
+	stream << input;
+	return stream.str();
+
+}
 int string_to_int(string me)
 {
 	char* output = new char[me.size()];
@@ -327,8 +338,8 @@ public:
 	{
 		this->num_v = 0;
 		//this->mapID = buffer[0][0];
-		this->prop_speed = (double) stoi(buffer[1]);
-		this->trans_speed = (double) stoi(buffer[2]);
+		this->prop_speed = (double) stod(buffer[1]);
+		this->trans_speed = (double) stod(buffer[2]);
 		this->num_e = buffer.size() - 3;
 
 		//test
@@ -500,9 +511,9 @@ int main()
 	response += " ";
 	response += to_string(map_of_maps[incoming_request->mapID]->get_e());
 	response += " ";
-	response += to_string(map_of_maps[incoming_request->mapID]->get_prop_speed());
+	response += double_to_string(map_of_maps[incoming_request->mapID]->get_prop_speed());
 	response += " ";
-	response += to_string(map_of_maps[incoming_request->mapID]->get_trans_speed());
+	response += double_to_string(map_of_maps[incoming_request->mapID]->get_trans_speed());
 	response += " ";
 
 

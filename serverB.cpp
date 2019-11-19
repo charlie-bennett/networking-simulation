@@ -164,114 +164,6 @@ public:
 	request_params<Node*>* parent_request;
 	string vertexID;
 };
-
-/*
-class Request
-{
-public:
-	char* response;
-
-	void dump()
-	{
-		string output = "";
-		output += to_string(file_size);
-		output += "||";
-		output += mapID;
-		output += "||";
-		output += to_string(num_v);
-		output += "||";
-		output += to_string(num_e);
-		output += "||";
-		output += to_string(prop_speed);
-		output += "||";
-		output += to_string(trans_speed);
-		output += "||";
-		std::ostringstream change_percision;
-
-		for (map<string, vector<double> >::iterator it = delay.begin(); it != delay.end(); ++it)
-		{
-			for (vector<double>::iterator iter = it->second.begin(); iter != it->second.end(); ++iter)
-			{
-				//change_percision.clear();
-				change_percision.str("");
-				change_percision.precision(3);
-				change_percision << fixed << *iter;
-				output += change_percision.str();
-				//output += to_string(*iter);
-				output += "||";
-			}
-		}
-		response = new char[output.size()];
-		for (int i = 0; i < output.size(); i++)
-		{
-			response[i] = output[i];
-		}
-		return;
-	}
-	Request(request_params* incoming_request)
-	{
-
-		this->file_size = incoming_request->file_size;
-		this->mapID = incoming_request->mapID;
-		this->num_v = incoming_request->num_v;
-		this-> num_e = incoming_request->num_e;
-		this-> prop_speed = incoming_request->prop_speed;
-		this->trans_speed = incoming_request->trans_speed;
-		this->distances = incoming_request->distances;
-		delay["Transmission"] = vector<double>(num_v);
-		delay["Propagation"] = vector<double>(num_v);
-		delay["Total"] = vector<double>(num_v);
-		delay["Destination"] = vector<double>(num_v);
-		for (int i = 0; i < num_v; i++)
-		{
-			delay["Transmission"][i] = (double) trans_speed * file_size;
-			delay["Propagation"][i] = (double) prop_speed * distances[1][i];
-			delay["Total"][i] = delay["Propagation"][i] + delay["Transmission"][i];
-			delay["Destination"][i] = distances[0][i];
-		}
-		dump();
-
-
-	}
-	void print()
-	{
-		cout << endl;
-		for (int i = 0; i < 50; i++) cout << "-";
-		cout << endl;
-		cout << "Destination Delay" << endl;
-		for (int i = 0; i < 50; i++) cout << "-";
-		cout << endl;
-		for (int i = 0; i < num_v; i++)
-		{
-			cout << delay["Destination"][i] << " ";
-			cout << setw(strlen("Destination")) << delay["Total"][i] << " ";
-			cout << endl;
-		}
-		for (int i = 0; i < 50; i++) cout << "-";
-		cout << endl;
-
-	}
-
-	int* prop;
-	//map<string, vector<double> > delay;
-	int file_size;
-	char mapID;
-	int num_v;
-	int num_e;
-	double prop_speed;
-	double trans_speed;
-	//int** distances;
-	//map < string, this->Delay > nodes;
-	char buffer[3000];
-
-
-};
-*/
-
-
-
-
-
 int next_index(char* buf, int start, int size)
 {
 	for (int i = start; i < size; i++)
@@ -312,19 +204,16 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 		incoming_request->num_v = string_to_int(output[2]);
 		incoming_request->num_e = string_to_int(output[3]);
 		incoming_request->prop_speed = stod(output[4]);
-
 		incoming_request->trans_speed = stod(output[5]);
-
 		incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
-
 		for (std::pair<vector<string>::iterator, vector<string>::iterator>
-		        it(next(output.begin(), 5), next(output.begin(), 6));
-		        it.first != prev(output.end(), 1);
+		        it(next(output.begin(), 6), next(output.begin(), 7));
+		        it.first != prev(output.end(), 2);
 		        it.first = next(it.first, 2), it.second = next(it.second, 2))
 			//advance(it.first, 2), advance(it.second, 2))
 		{
-			incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
 
+			incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
 
 
 		}
@@ -416,8 +305,8 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 	incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
 
 	for (std::pair<vector<string>::iterator, vector<string>::iterator>
-	        it(next(output.begin(), 5), next(output.begin(), 6));
-	        it.first != prev(output.end(), 1);
+	        it(next(output.begin(), 6), next(output.begin(), 7));
+	        it.first != prev(output.end(), 2);
 	        it.first = next(it.first, 2), it.second = next(it.second, 2))
 	{
 		incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
