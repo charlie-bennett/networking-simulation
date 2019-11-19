@@ -37,6 +37,51 @@ int string_to_int(string me)
 	return atoi(output);
 }
 
+vector<string> delimit(string input, char delimiter, int max_size = RELINF)
+{
+	vector<string> output;
+	string::iterator head = input.begin();
+	for (string::iterator tail = input.begin(); tail != input.end(); ++tail)
+	{
+		char word = *tail;
+		if (word == delimiter)
+		{
+
+			output.push_back(string(head, tail));
+			head = next(tail, 1);
+			if (output.size() == max_size)
+			{
+				return output;
+			}
+		}
+	}
+	//add last element
+	if (*prev(input.end(), 1) != ' ')
+	{
+		output.push_back(string(head, input.end()));
+	}
+	return output;
+}
+
+
+
+char* to_cstring(string input)
+{
+	char* output = new char[input.size()];
+	for (int i = 0; i < input.size(); i++)
+	{
+		output[i] = input[i];
+	}
+	return output;
+}
+
+string from_cstring(char* input)
+{
+	string output;
+	output += input;
+	return output;
+}
+
 void* get_in_addr(struct sockaddr* sa)
 {
 	if (sa->sa_family == AF_INET)
@@ -118,6 +163,15 @@ int udp_listen(Request* incoming_request, bool boot_up)
 {
 	//from beej
 	//********************************
+	bool debug = 1;
+	if (debug)
+	{
+		vector<string> delimited = delimit(from_cstring("A 2 2000"), ' ', 3);
+		incoming_request->mapID = delimited[0];
+		incoming_request->src = delimited[1];
+		incoming_request->file_size = string_to_int(delimited[2]);
+		return 0;
+	}
 	int sockfd;
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
@@ -148,15 +202,13 @@ int udp_listen(Request* incoming_request, bool boot_up)
 			continue;
 		}
 
-//TODO
-		/*
-				if ((bind(sockfd, p->ai_addr, p->ai_paddrlen) == -1))
-				{
-					close(sockfd);
-					perror("listener: bind");
-					continue;
-				}
-				*/
+		if ((::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1))
+		{
+			close(sockfd);
+			perror("listener: bind");
+			continue;
+		}
+
 
 		break;
 	}
@@ -191,60 +243,14 @@ int udp_listen(Request* incoming_request, bool boot_up)
 	buf[numbytes] = '\0';
 	printf("listener: packet contains \"%s\"\n", buf);
 
-
 	close(sockfd);
 	//********************************
+	vector<string> delimited = delimit(from_cstring(buf), ' ', 3);
+	incoming_request->mapID = delimited[0];
+	incoming_request->src = delimited[1];
+	incoming_request->file_size = string_to_int(delimited[2]);
 
-	vector<string> inputs(2); //hold first two entries
-	int trail = 0;
-	int place = 0;
-	string interm;
 
-	for (int i = 0; i < numbytes; i++)
-	{
-		if (buf[i] == ' ')
-		{
-			inputs[place] = interm;
-			if (place == 2) break;
-			place++;
-			interm = "";
-		}
-		else
-		{
-			interm += buf[i];
-		}
-
-	}
-	incoming_request->mapID = inputs[0];
-	incoming_request->src = inputs[1];
-	incoming_request->file_size = string_to_int(interm);
-	//string.inputs[3] = string_to_int(interm);
-
-	/*
-		char source[256];
-		char file_size[256];
-		int file_size_loc = 0;
-		for (int i = 3; i < numbytes; i++)
-		{
-			if (file_size_loc == 0)
-			{
-				if (buf[i] != '|')
-				{
-					source[i - 3] = buf[i];
-				}
-				else
-				{
-					file_size_loc = i + 2;
-				}
-			}
-			else
-			{
-				file_size[i - file_size_loc] = buf[i];
-			}
-		}
-		incoming_request->src = atoi(source);
-		incoming_request->file_size = atoi(file_size);
-		*/
 
 	return 0;
 
@@ -315,23 +321,7 @@ public:
 	int get_e() {return this->num_e;}
 	double get_prop_speed() {return this->prop_speed;}
 	double get_trans_speed() {return this->trans_speed;}
-	/*
-	vector<int> get_alias()
-	{
-		vector<int> output(num_v);
-		int count = 0;
-		cout << "BEGIN TEST" << endl;
-		for (map<int, int>::iterator it = aliases.begin();
-		        it != aliases.end(); ++it)
-		{
-			output[count] = it->first;
-			cout << output[count] << endl;
-			count++;
-		}
-		return output;
-	}
-	*/
-	//map<int, int>* get_alias() {return &aliases;}
+
 
 	map_info(vector<string> buffer, string mapID): buffer(buffer), mapID(mapID)
 	{
@@ -347,50 +337,13 @@ public:
 		//vector<vector<string> > nodes;
 		string dummy;
 		int running = 0;
-		vector<tuple<string, string, int>> nodes; //to from cost
+		vector<vector<string>> nodes; //to from cost
 		for (auto line : buffer)
 		{
 
-			// to from cost (0, 2, 4)
-			int loc = 0;
-			string interm;
-
-			tuple<string, string, int> node;
-
-			for (int i = 0; i < line.size(); i++)
-			{
-				if (line[i] == ' ')
-				{
-					if (loc == 0)
-					{
-
-
-						to = interm;
-						get<0>(node) = interm;
-						interm = "";
-
-						loc++;
-					}
-					else if (loc == 1)
-					{
-						from = interm;
-						get<1>(node) = interm;
-						interm = "";
-
-						loc++;
-
-					}
-					else if (loc == 3) break;
-				}
-				else
-				{
-					interm += line[i];
-				}
-
-			}
-			get<2>(node) = string_to_int(interm);
-			cost = string_to_int(interm);
-			nodes.push_back(node);
+			nodes.push_back(delimit(line, ' ', 3));
+			to = nodes.back()[0];
+			from = nodes.back()[1];
 			if (aliases.find(to) == aliases.end())
 			{
 				aliases.insert({to, running});
@@ -409,14 +362,12 @@ public:
 			graph[i] = new int[num_v];
 			for (int j = 0; j < num_v; j++) graph[i][j] = 0;
 		}
-		cout << "size of nodes " << nodes.size() << endl;
 
 		for (auto node : nodes)
 		{
-			//cout << " to " << get<0>(node) << " from " << get<1>(node) << " cost " << get<2>(node) << endl;
-			to = get<0>(node);
-			from = get<1>(node);
-			cost = get<2>(node);
+			to = node[0];
+			from = node[1];
+			cost = string_to_int(node[2]);
 			graph[aliases[to]][aliases[from]] = cost;
 		}
 
@@ -526,6 +477,7 @@ int main()
 	string response;
 	response = "";
 	//listen
+
 	if (udp_listen(incoming_request, true))
 	{
 		//whoops we got an error
@@ -533,9 +485,11 @@ int main()
 
 
 
-	char* message = "The Server A has recieved input for finding the shortest paths: starting vertext %d of map %c.\n";
+
+
+	string message = "The Server A has recieved input for finding the shortest paths: starting vertext %c of map %c.\n";
 	//printf(message, incoming_request->src, incoming_request->mapID);
-	printf(message);
+	printf(to_cstring(message), to_cstring(incoming_request->src), to_cstring(incoming_request->mapID));
 	cout << incoming_request->src << " " << incoming_request->mapID;
 	//Populate first values of response
 	response += to_string(incoming_request->file_size);

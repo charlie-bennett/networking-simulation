@@ -191,14 +191,14 @@ int udp_listen(request_params* incoming_request, bool boot_up)
 			continue;
 		}
 //TODO
-		/*
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+
+		if (::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
 		{
 			close(sockfd);
 			perror("listener: bind");
 			continue;
 		}
-		*/
+
 
 		break;
 	}

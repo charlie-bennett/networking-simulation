@@ -11,12 +11,23 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <string>
 
 #include <arpa/inet.h>
 
 #define PORT "23095" // the port client will be connecting to 
-
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
+using namespace std;
+
+char* to_cstring(string input)
+{
+	char* output = new char[input.size()];
+	for (int i = 0; i < input.size(); i++)
+	{
+		output[i] = input[i];
+	}
+	return output;
+}
 
 // get sockaddr, IPv4 or IPv6:
 void* get_in_addr(struct sockaddr* sa)
@@ -42,7 +53,7 @@ int main(int argc, char* argv[])
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if ((rv = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo)) != 0)
+	if ((rv = getaddrinfo("127.0.0.1", to_cstring(PORT), &hints, &servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -80,7 +91,15 @@ int main(int argc, char* argv[])
 
 	freeaddrinfo(servinfo); // all done with this structure
 
-	if (send(sockfd, "A||2||20", 13, 0) == -1)
+	string to_send;
+	for (int i = 1; i < argc; i++)
+	{
+
+		to_send += argv[i];
+		to_send += ' ';
+	}
+
+	if (send(sockfd, to_cstring(to_send), to_send.size(), 0) == -1)
 		perror("send");
 
 	if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)

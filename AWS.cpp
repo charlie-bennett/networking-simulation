@@ -28,6 +28,16 @@ using namespace std;
 #define MAXDATASIZE 100 // max number of bytes we can get at once
 char buf[MAXBUFLEN];
 
+char* to_cstring(string input)
+{
+	char* output = new char[input.size()];
+	for (int i = 0; i < input.size(); i++)
+	{
+		output[i] = input[i];
+	}
+	return output;
+}
+
 void sigchld_handler(int s)
 {
 	// waitpid() might overwrite errno, so we save and restore it:
@@ -71,7 +81,7 @@ int tcp(bool rxtx)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE; // use my IP
 
-	if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0)
+	if ((rv = getaddrinfo(NULL, to_cstring(MYPORT), &hints, &servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -93,15 +103,14 @@ int tcp(bool rxtx)
 			perror("setsockopt");
 			exit(1);
 		}
-		//TODO
-		/*
-				if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-				{
-					close(sockfd);
-					perror("server: bind");
-					continue;
-				}
-				*/
+
+		if (::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			close(sockfd);
+			perror("server: bind");
+			continue;
+		}
+
 
 		break;
 	}
@@ -256,7 +265,7 @@ int udp_listen()
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE; // use my IP
 
-	if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0)
+	if ((rv = getaddrinfo(NULL, to_cstring(MYPORT), &hints, &servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -272,14 +281,14 @@ int udp_listen()
 			continue;
 		}
 		//TODO
-		/*
-				if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-				{
-					close(sockfd);
-					perror("listener: bind");
-					continue;
-				}
-				*/
+
+		if (::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			close(sockfd);
+			perror("listener: bind");
+			continue;
+		}
+
 
 		break;
 	}
