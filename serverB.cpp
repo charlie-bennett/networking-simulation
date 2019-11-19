@@ -296,6 +296,41 @@ void* get_in_addr(struct sockaddr* sa)
 
 int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 {
+	bool debug = 1;
+	if (debug)
+	{
+		char* buf = "20 A 6 5 1.000000 2.000000 0 24 1 31 2 0 3 15 4 20 5 22 ";
+
+		vector<string> output = delimit(from_cstring(buf), ' ');
+		cout << "OUTPUT" << endl;
+		for (auto entry : output)
+		{
+			cout << entry << endl;
+		}
+		incoming_request->file_size = string_to_int(output[0]);
+		incoming_request->mapID = output[1];
+		incoming_request->num_v = string_to_int(output[2]);
+		incoming_request->num_e = string_to_int(output[3]);
+		incoming_request->prop_speed = stod(output[4]);
+
+		incoming_request->trans_speed = stod(output[5]);
+
+		incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
+
+		for (std::pair<vector<string>::iterator, vector<string>::iterator>
+		        it(next(output.begin(), 5), next(output.begin(), 6));
+		        it.first != prev(output.end(), 1);
+		        it.first = next(it.first, 2), it.second = next(it.second, 2))
+			//advance(it.first, 2), advance(it.second, 2))
+		{
+			incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
+
+
+
+		}
+
+		return 0;
+	}
 	//from beej
 	//********************************
 	int sockfd;
@@ -327,8 +362,6 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 			perror("listener: socket");
 			continue;
 		}
-//TODO
-
 		if (::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
 		{
 			close(sockfd);
@@ -383,9 +416,9 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 	incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
 
 	for (std::pair<vector<string>::iterator, vector<string>::iterator>
-	        it(output.begin(), next(output.begin(), 1));
+	        it(next(output.begin(), 5), next(output.begin(), 6));
 	        it.first != prev(output.end(), 1);
-	        advance(it.first, 2), advance(it.second, 2))
+	        it.first = next(it.first, 2), it.second = next(it.second, 2))
 	{
 		incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
 	}
@@ -456,16 +489,15 @@ int udp_send(char* message, char* port) //please dont forget terminating char
 
 int main()
 {
-	while (true)
-	{
-		request_params<Node*>* incoming_request = new request_params<Node*>;
-		udp_listen(incoming_request, true); //is this blocking?
-		//recieved data
-		cout << endl << "The Server B has recieved data for calculation:" << endl;
-		incoming_request->print_input();
-		incoming_request->print_output();
-		if (udp_send(to_cstring(incoming_request->get_output()), AWS)) {} //whoops
-		cout << endl << "The Server B has finished sending the output to AWS" << endl;
-	}
+
+	request_params<Node*>* incoming_request = new request_params<Node*>;
+	udp_listen(incoming_request, true); //is this blocking?
+	//recieved data
+	cout << endl << "The Server B has recieved data for calculation:" << endl;
+	incoming_request->print_input();
+	incoming_request->print_output();
+	if (udp_send(to_cstring(incoming_request->get_output()), AWS)) {} //whoops
+	cout << endl << "The Server B has finished sending the output to AWS" << endl;
+
 
 }
