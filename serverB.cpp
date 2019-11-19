@@ -22,22 +22,155 @@
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
-
-struct request_params
+int string_to_int(string me)
 {
+	char* output = new char[me.size()];
+	for ( int i = 0; i < me.size(); i++)
+	{
+		output[i] =  me[i];
+	}
+
+	return atoi(output);
+}
+
+vector<string> delimit(string input, char delimiter, int max_size = RELINF)
+{
+	vector<string> output;
+	string::iterator head = input.begin();
+	for (string::iterator tail = input.begin(); tail != input.end(); ++tail)
+	{
+		char word = *tail;
+		if (word == delimiter)
+		{
+
+			output.push_back(string(head, tail));
+			head = next(tail, 1);
+			if (output.size() == max_size)
+			{
+				return output;
+			}
+		}
+	}
+	//add last element
+	if (*prev(input.end(), 1) != ' ')
+	{
+		output.push_back(string(head, input.end()));
+	}
+	return output;
+}
+
+
+
+char* to_cstring(string input)
+{
+	char* output = new char[input.size()];
+	for (int i = 0; i < input.size(); i++)
+	{
+		output[i] = input[i];
+	}
+	return output;
+}
+
+string from_cstring(char* input)
+{
+	string output;
+	output += input;
+	return output;
+}
+template<class T>
+class request_params
+{
+public:
+	void set_info(vector<string> input)
+	{
+		copy(input.begin(), input.end(), back_inserter(this->info));
+		return;
+	}
+	void print_input()
+	{
+		printf("*Propagation speed: %f km / s\n", this->prop_speed);
+		printf("*Transmiission speed: %f Bytes / s\n", this->trans_speed);
+		for (int i = 0; i < 50; i++) cout << "-";
+		cout << endl;
+		for (auto node : this->nodes)
+		{
+			printf("*Path length for destination %s : %f\n", to_cstring(node->vertexID), node->dist);
+		}
+		cout << endl;
+		return;
+
+	}
+	string get_output()
+	{
+		for (auto entry : this->info)
+		{
+			output += entry;
+			output += ' ';
+		}
+		for (auto node : this->nodes)
+		{
+			for (auto entry : node->info)
+			{
+				output += entry;
+				output += ' ';
+			}
+		}
+		return output;
+	}
+	void print_output()
+	{
+		for (int i = 0; i < 50; i++) cout << "-";
+		cout << endl;
+		cout << "Destination Delay" << endl;
+		for (int i = 0; i < 50; i++) cout << "-";
+		cout << endl;
+		for (auto node : this->nodes)
+		{
+			cout << node->vertexID << std::setw(strlen("Destination")) << node->total_delay << endl;
+		}
+		for (int i = 0; i < 50; i++) cout << "-";
+		cout << endl;
+		return;
+	}
 	int file_size;
-	char mapID;
+	string mapID;
 	int num_v;
 	int num_e;
 	double prop_speed;
 	double trans_speed;
-	int* distances[2];
+	vector<T> nodes;
+	vector<string> info;
+	string output;
+
+};
+class Node
+{
+public:
+	Node(string vertexID, double dist, request_params<Node*>* parent_request) : dist(dist), vertexID(vertexID), parent_request(parent_request)
+	{
+		this->trans_delay = parent_request->trans_speed * parent_request->file_size;
+		this->prop_delay = parent_request->prop_speed * this->dist;
+		this->total_delay = this->trans_delay * this->prop_delay;
+		this->info.push_back(vertexID);
+		this->info.push_back(to_string(trans_delay));
+		this->info.push_back(to_string(prop_delay));
+		this->info.push_back(to_string(total_delay));
+	}
+	double dist;
+	double trans_delay;
+	double prop_delay;
+	double total_delay;
+	vector<string> info;
+	request_params<Node*>* parent_request;
+	string vertexID;
 };
 
+/*
 class Request
 {
 public:
 	char* response;
+
 	void dump()
 	{
 		string output = "";
@@ -120,18 +253,22 @@ public:
 	}
 
 	int* prop;
-	map<string, vector<double> > delay;
+	//map<string, vector<double> > delay;
 	int file_size;
 	char mapID;
 	int num_v;
 	int num_e;
 	double prop_speed;
 	double trans_speed;
-	int** distances;
+	//int** distances;
+	//map < string, this->Delay > nodes;
 	char buffer[3000];
 
 
 };
+*/
+
+
 
 
 
@@ -157,7 +294,7 @@ void* get_in_addr(struct sockaddr* sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int udp_listen(request_params* incoming_request, bool boot_up)
+int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 {
 	//from beej
 	//********************************
@@ -213,7 +350,7 @@ int udp_listen(request_params* incoming_request, bool boot_up)
 
 	if (boot_up)
 	{
-		printf("The Server B is up and running using UDP on port %d", MYPORT);
+		printf("The Server B is up and running using UDP on port %c", to_cstring(MYPORT));
 	}
 	else {} //do something here
 
@@ -236,32 +373,21 @@ int udp_listen(request_params* incoming_request, bool boot_up)
 
 	close(sockfd);
 	//********************************
-	incoming_request->file_size = atoi(buf);
-	int start = 0;
-	start = next_index(buf, start, numbytes);
-	incoming_request->mapID = buf[start];
-	start = next_index(buf, start, numbytes);
-	incoming_request->num_v = atoi(buf + start);
-	start = next_index(buf, start, numbytes);
-	incoming_request->num_e = atoi(buf + start);
-	start = next_index(buf, start, numbytes);
-	incoming_request->prop_speed = atoi(buf + start);
-	start = next_index(buf, start, numbytes);
-	incoming_request->trans_speed = atoi(buf + start);
-	start = next_index(buf, start, numbytes);
-	int node = 0;
-	int count = 0;
+	vector<string> output = delimit(from_cstring(buf), ' ');
+	incoming_request->file_size = string_to_int(output[0]);
+	incoming_request->mapID = output[1];
+	incoming_request->num_v = string_to_int(output[2]);
+	incoming_request->num_e = string_to_int(output[3]);
+	incoming_request->prop_speed = stod(output[4]);
+	incoming_request->trans_speed = stod(output[5]);
+	incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
 
-
-	incoming_request->distances[0] = new int[incoming_request->num_v];
-	incoming_request->distances[1] = new int[incoming_request->num_v];
-	while (start < numbytes)
+	for (std::pair<vector<string>::iterator, vector<string>::iterator>
+	        it(output.begin(), next(output.begin(), 1));
+	        it.first != prev(output.end(), 1);
+	        advance(it.first, 2), advance(it.second, 2))
 	{
-
-		incoming_request->distances[node][count] = atoi(buf + start);
-		if (node) count++;
-		node = !(node);
-		start = next_index(buf, start, numbytes);
+		incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
 	}
 
 	return 0;
@@ -332,21 +458,13 @@ int main()
 {
 	while (true)
 	{
-		request_params* incoming_request = new request_params;
+		request_params<Node*>* incoming_request = new request_params<Node*>;
 		udp_listen(incoming_request, true); //is this blocking?
 		//recieved data
 		cout << endl << "The Server B has recieved data for calculation:" << endl;
-		printf("*Propagation speed: %f km / s\n", incoming_request->prop_speed);
-		printf("*Transmiission speed: %f Bytes / s\n", incoming_request->trans_speed);
-		for (int i = 0; i < incoming_request->num_v; i++)
-		{
-			printf("*Path length for destination %d : %d\n", incoming_request->distances[0][i],
-			       incoming_request->distances[1][i]);
-		}
-
-		Request* processed_request = new Request(incoming_request);
-		processed_request->print();
-		if (udp_send(processed_request->response, AWS)) {} //whoops
+		incoming_request->print_input();
+		incoming_request->print_output();
+		if (udp_send(to_cstring(incoming_request->get_output()), AWS)) {} //whoops
 		cout << endl << "The Server B has finished sending the output to AWS" << endl;
 	}
 

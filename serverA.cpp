@@ -163,7 +163,7 @@ int udp_listen(Request* incoming_request, bool boot_up)
 {
 	//from beej
 	//********************************
-	bool debug = 1;
+	bool debug = 0;
 	if (debug)
 	{
 		vector<string> delimited = delimit(from_cstring("A 2 2000"), ' ', 3);
@@ -355,7 +355,7 @@ public:
 				running++;
 			}
 		}
-		this->num_v = running + 1;
+		this->num_v = running;
 		graph = new int* [num_v];
 		for (int i = 0; i < num_v; i++)
 		{
@@ -493,17 +493,17 @@ int main()
 	cout << incoming_request->src << " " << incoming_request->mapID;
 	//Populate first values of response
 	response += to_string(incoming_request->file_size);
-	response += "||";
+	response += " ";
 	response += map_of_maps[incoming_request->mapID]->get_mapID();
-	response += "||";
+	response += " ";
 	response += to_string(map_of_maps[incoming_request->mapID]->get_v());
-	response += "||";
+	response += " ";
 	response += to_string(map_of_maps[incoming_request->mapID]->get_e());
-	response += "||";
+	response += " ";
 	response += to_string(map_of_maps[incoming_request->mapID]->get_prop_speed());
-	response += "||";
+	response += " ";
 	response += to_string(map_of_maps[incoming_request->mapID]->get_trans_speed());
-	response += "||";
+	response += " ";
 
 
 
@@ -524,9 +524,9 @@ int main()
 	{
 		cout << (it.second->first) << " " << (*it.first) << endl;
 		response += string(it.second->first);
-		response += "||";
+		response += ' ';
 		response += to_string(*it.first);
-		response += "||";
+		response += ' ';
 	}
 
 
