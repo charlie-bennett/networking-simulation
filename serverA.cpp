@@ -86,6 +86,15 @@ char* to_cstring(string input)
 	return output;
 }
 
+void copy_to_cstring(string input, char* copy)
+{
+	for (int i = 0; i < input.size(); i++)
+	{
+		copy[i] = input[i];
+	}
+	return;
+}
+
 string from_cstring(char* input)
 {
 	string output;
@@ -498,8 +507,9 @@ int main()
 
 
 
-	string message = "The Server A has recieved input for finding the shortest paths: starting vertext %c of map %c.\n";
+	string message = "The Server A has recieved input for finding the shortest paths: starting vertext %s of map %s.\n";
 	//printf(message, incoming_request->src, incoming_request->mapID);
+	cout << "this is a test " << incoming_request->src << " " << to_cstring(incoming_request->mapID) << endl;
 	printf(to_cstring(message), to_cstring(incoming_request->src), to_cstring(incoming_request->mapID));
 	cout << incoming_request->src << " " << incoming_request->mapID;
 	//Populate first values of response
@@ -539,6 +549,7 @@ int main()
 		response += to_string(*it.first);
 		response += ' ';
 	}
+	response += '\0';
 
 
 	for (int i = 0; i < 45; i++) cout << "-";
@@ -546,11 +557,15 @@ int main()
 
 	//send
 	Responses.push_back(new char[response.size()]);
+	//Responses.back() = to_cstring()
+	/*
 	for (int i = 0; i < response.size(); i++)
 	{
 		Responses[Responses.size() - 1][i] = response[i];
 	}
-
+	Responses.back()
+	*/
+	copy_to_cstring(response, Responses.back());
 	//wait to send
 	for (int i = 0; i < 100000000; i++) {}
 	udp_send(Responses.back());

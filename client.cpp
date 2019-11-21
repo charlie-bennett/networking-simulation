@@ -90,7 +90,18 @@ int main(int argc, char* argv[])
 	printf("client: connecting to %s\n", s);
 
 	freeaddrinfo(servinfo); // all done with this structure
-
+//TODO
+	/*
+	/*Retrieve     the  locally-bound  name of   the  specified
+	 socket and store it in the sockaddr structure
+	getsock_check = getsockname(TCP_Connect_Sock, (struct sockaddr
+	                            *)&my_addr, (socklen_t*)&addrlen);
+	//Error checking
+	if (getsock_check == -1)
+	{
+		perror("getsockname"); exit(1);
+	}
+	*/
 	string to_send;
 	for (int i = 1; i < argc; i++)
 	{
@@ -98,14 +109,18 @@ int main(int argc, char* argv[])
 		to_send += argv[i];
 		to_send += ' ';
 	}
+	to_send += '\0';
 
 	if (send(sockfd, to_cstring(to_send), to_send.size(), 0) == -1)
 		perror("send");
-
-	if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)
+	while (1)
 	{
-		perror("recv");
-		exit(1);
+		if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)
+		{
+			perror("recv");
+			exit(1);
+		}
+		else if (numbytes > 1) break;
 	}
 
 	buf[numbytes] = '\0';

@@ -19,6 +19,7 @@
 #define MYPORT "22095"
 #define AWS "23095"   // the port users will be connecting to
 #define MAXBUFLEN 100
+#define PRECISION 3
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
@@ -31,6 +32,16 @@ int string_to_int(string me)
 	}
 
 	return atoi(output);
+}
+
+string double_to_string(double input)
+{
+	ostringstream stream;
+	stream << std::fixed;
+	stream << setprecision(PRECISION);
+	stream << input;
+	return stream.str();
+
 }
 
 vector<string> delimit(string input, char delimiter, int max_size = RELINF)
@@ -58,9 +69,6 @@ vector<string> delimit(string input, char delimiter, int max_size = RELINF)
 	}
 	return output;
 }
-
-
-
 char* to_cstring(string input)
 {
 	char* output = new char[input.size()];
@@ -115,6 +123,7 @@ public:
 				output += ' ';
 			}
 		}
+		output += '\0';
 		return output;
 	}
 	void print_output()
@@ -139,6 +148,7 @@ public:
 	double prop_speed;
 	double trans_speed;
 	vector<T> nodes;
+private:
 	vector<string> info;
 	string output;
 
@@ -152,9 +162,9 @@ public:
 		this->prop_delay = parent_request->prop_speed * this->dist;
 		this->total_delay = this->trans_delay * this->prop_delay;
 		this->info.push_back(vertexID);
-		this->info.push_back(to_string(trans_delay));
-		this->info.push_back(to_string(prop_delay));
-		this->info.push_back(to_string(total_delay));
+		this->info.push_back(double_to_string(trans_delay));
+		this->info.push_back(double_to_string(prop_delay));
+		this->info.push_back(double_to_string(total_delay));
 	}
 	double dist;
 	double trans_delay;
@@ -175,20 +185,18 @@ int next_index(char* buf, int start, int size)
 	}
 	return -1;
 }
-
 void* get_in_addr(struct sockaddr* sa)
 {
 	if (sa->sa_family == AF_INET)
 	{
 		return &(((struct sockaddr_in*)sa)->sin_addr);
 	}
-
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-
 int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 {
-	bool debug = 1;
+	/*
+	bool debug = 0;
 	if (debug)
 	{
 		char* buf = "20 A 6 5 1.000000 2.000000 0 24 1 31 2 0 3 15 4 20 5 22 ";
@@ -212,14 +220,12 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 		        it.first = next(it.first, 2), it.second = next(it.second, 2))
 			//advance(it.first, 2), advance(it.second, 2))
 		{
-
 			incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
-
-
 		}
 
 		return 0;
 	}
+	*/
 	//from beej
 	//********************************
 	int sockfd;
@@ -272,7 +278,7 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 
 	if (boot_up)
 	{
-		printf("The Server B is up and running using UDP on port %c", to_cstring(MYPORT));
+		printf("The Server B is up and running using UDP on port %s", to_cstring(MYPORT));
 	}
 	else {} //do something here
 
@@ -315,7 +321,6 @@ int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
 	return 0;
 
 }
-
 int udp_send(char* message, char* port) //please dont forget terminating char
 {
 
@@ -373,9 +378,6 @@ int udp_send(char* message, char* port) //please dont forget terminating char
 
 	return 0;
 }
-
-
-
 int main()
 {
 
@@ -385,7 +387,7 @@ int main()
 	cout << endl << "The Server B has recieved data for calculation:" << endl;
 	incoming_request->print_input();
 	incoming_request->print_output();
-	if (udp_send(to_cstring(incoming_request->get_output()), AWS)) {} //whoops
+	if (udp_send(to_cstring(incoming_request->get_output()), to_cstring(AWS))) {} //whoops
 	cout << endl << "The Server B has finished sending the output to AWS" << endl;
 
 
