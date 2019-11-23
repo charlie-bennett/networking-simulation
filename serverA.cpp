@@ -24,6 +24,9 @@ using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
 #define PRECISION 3
+char buf[MAXBUFLEN];
+
+//TODO: EXCEPTION HANDLING
 
 //the following is from Beej guid
 //************
@@ -113,14 +116,132 @@ void* get_in_addr(struct sockaddr* sa)
 }
 //****************
 
-struct Request
+class Request
 {
+public:
 	string mapID;
 	string src;
 	int file_size;
+	Request()
+	{
+		vector<string> delimited = delimit(from_cstring(buf), ' ', 3);
+		mapID = delimited[0];
+		src = delimited[1];
+		cout << from_cstring(buf) << endl;
+		file_size = string_to_int(delimited[2]);
+	}
 };
 
+class UDP
+{
+public:
+	struct addrinfo hints, *my_address, *servinfo, *AWS_address;
+	int sock_fd, init_rv = 0;
+	map<string, addrinfo*> addresses;
+	UDP()
+	{
+		cout << "enter UDP init" << endl;
+		memset(&this->hints, 0, sizeof this->hints);
+		this->hints.ai_family = AF_INET;
+		this->hints.ai_socktype = SOCK_DGRAM;
+		int rv;
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(MYPORT), &(this->hints), &(this->servinfo))) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		for (my_address = servinfo; my_address != NULL; my_address = my_address->ai_next)
+		{
 
+			if ((sock_fd = socket(my_address->ai_family, my_address->ai_socktype,
+			                      my_address->ai_protocol)) == -1)
+			{
+				perror("listener: socket");
+				continue;
+			}
+
+			if (::bind(sock_fd, my_address->ai_addr, my_address->ai_addrlen) == -1)
+			{
+				close(sock_fd);
+				perror("listener: bind");
+				continue;
+			}
+
+
+			break;
+		}
+		if (my_address == NULL)
+		{
+			fprintf(stderr, "listener: failed to bind socket\n");
+			init_rv = 2;
+		}
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(AWS), &hints, &AWS_address)) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		addresses.insert({"me", my_address});
+		addresses.insert({"aws", AWS_address});
+		cout << "exit udp_init" << endl;
+
+	}
+	int send(string server_ID, char* message, int message_size)
+	{
+		message[message_size] = '\0';
+		int numbytes;
+		struct addrinfo* p = addresses[server_ID];
+		if ((numbytes = sendto(this->sock_fd, message, message_size, 0,
+		                       p->ai_addr, p->ai_addrlen)) == -1)
+		{
+			perror("talker: sendto");
+			exit(1);
+			return 1;
+		}
+
+
+		printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
+		return 0;
+	}
+	int recieve()
+	{
+		int rv;
+		int numbytes;
+		struct sockaddr_storage their_addr;
+		//char buf[MAXBUFLEN];
+		socklen_t addr_len;
+		char s[INET6_ADDRSTRLEN];
+		addr_len = sizeof their_addr;
+		if ((numbytes = recvfrom(sock_fd, buf, MAXBUFLEN - 1 , 0,
+		                         (struct sockaddr*)&their_addr, &addr_len)) == -1)
+		{
+			perror("recvfrom");
+			exit(1);
+			return 1;
+		}
+
+		printf("listener: got packet from %s\n",
+		       inet_ntop(their_addr.ss_family,
+		                 get_in_addr((struct sockaddr*)&their_addr),
+		                 s, sizeof s));
+		printf("listener: packet is %d bytes long\n", numbytes);
+		buf[numbytes] = '\0';
+		printf("listener: packet contains \"%s\"\n", buf);
+		cout << "exit udp listen" << endl;
+		return 0;
+	}
+
+	~UDP()
+	{
+		for (auto address : addresses)
+		{
+			freeaddrinfo(address.second);
+		}
+		close(sock_fd);
+
+	}
+};
+
+/*
 int udp_send(char* message) //please dont forget terminating char
 {
 
@@ -211,7 +332,6 @@ int udp_listen(Request* incoming_request, bool boot_up)
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
-
 	// loop through all the results and bind to the first we can
 	for (p = servinfo; p != NULL; p = p->ai_next)
 	{
@@ -228,8 +348,6 @@ int udp_listen(Request* incoming_request, bool boot_up)
 			perror("listener: bind");
 			continue;
 		}
-
-
 		break;
 	}
 
@@ -270,11 +388,10 @@ int udp_listen(Request* incoming_request, bool boot_up)
 	incoming_request->src = delimited[1];
 	incoming_request->file_size = string_to_int(delimited[2]);
 
-
-
 	return 0;
 
 }
+*/
 class map_info
 {
 public:
@@ -302,9 +419,7 @@ public:
 				{
 					min_v = output[j];
 					index_v = j;
-
 				}
-
 			}
 			inPath[index_v] = 1;
 			if (output[index_v] >= RELINF) continue; //try w and w/o this
@@ -320,7 +435,6 @@ public:
 					}
 				}
 			}
-
 		}
 
 		delete [] inPath;
@@ -350,17 +464,13 @@ public:
 		this->prop_speed = (double) stod(buffer[1]);
 		this->trans_speed = (double) stod(buffer[2]);
 		this->num_e = buffer.size() - 3;
-
-		//test
 		string to, from;
 		int cost;
-		//vector<vector<string> > nodes;
 		string dummy;
 		int running = 0;
 		vector<vector<string>> nodes; //to from cost
 		for (auto line : buffer)
 		{
-
 			nodes.push_back(delimit(line, ' ', 3));
 			to = nodes.back()[0];
 			from = nodes.back()[1];
@@ -390,19 +500,6 @@ public:
 			cost = string_to_int(node[2]);
 			graph[aliases[to]][aliases[from]] = cost;
 		}
-
-
-
-		/*
-		vector<string> dum;
-
-		for (int i = 0; i < nodes.size(); i++)
-		{
-			to = nodes[i][0];
-			from = nodes[i][1];
-			cost = string_to_int(nodes[i][2]);
-		}
-		*/
 		for (int i = 0; i < num_v; i++)
 		{
 			for (int j = 0; j < num_v; j++) cout << " " << graph[i][j];
@@ -463,16 +560,13 @@ vector<map_info*> read_file(string file_name)
 	return maps;
 }
 
-
 int main()
 {
-
-	//udp_send("test");
 	vector<char*> Responses;
 	vector<map_info*> maps = read_file("map.txt");
-	//maps[0]->get_dijkstra(0);
 	map<string, map_info*> map_of_maps;
 	vector<vector<int> > shortest_paths;
+	UDP udp;
 
 	//construct map
 	printf("\nThe Server A has constructed a list of %lu maps:\n", maps.size());
@@ -492,20 +586,13 @@ int main()
 	for (int i = 0; i < 45; i++) cout << "-";
 	cout << endl;
 
-	Request* incoming_request = new Request;
+
 	//while loop here
 	string response;
 	response = "";
 	//listen
-
-	if (udp_listen(incoming_request, true))
-	{
-		//whoops we got an error
-	}
-
-
-
-
+	udp.recieve();
+	Request* incoming_request = new Request();
 
 	string message = "The Server A has recieved input for finding the shortest paths: starting vertext %s of map %s.\n";
 	//printf(message, incoming_request->src, incoming_request->mapID);
@@ -568,7 +655,8 @@ int main()
 	copy_to_cstring(response, Responses.back());
 	//wait to send
 	for (int i = 0; i < 100000000; i++) {}
-	udp_send(Responses.back());
+	//udp_send(Responses.back());
+	udp.send("aws", Responses.back(), response.size());
 
 	delete [] Responses.back();
 

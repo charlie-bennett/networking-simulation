@@ -23,6 +23,7 @@
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
+char buf[MAXBUFLEN];
 int string_to_int(string me)
 {
 	char* output = new char[me.size()];
@@ -85,10 +86,62 @@ string from_cstring(char* input)
 	output += input;
 	return output;
 }
-template<class T>
+//template<class T>
 class request_params
 {
+private:
+	vector<string> info;
+	string output;
 public:
+	int file_size;
+	string mapID;
+	int num_v;
+	int num_e;
+	double prop_speed;
+	double trans_speed;
+	//vector<T> nodes;
+	class Node
+	{
+	public:
+		Node(string vertexID, double dist, request_params* parent_request) : dist(dist), vertexID(vertexID), parent_request(parent_request)
+		{
+			this->trans_delay = parent_request->trans_speed * parent_request->file_size;
+			this->prop_delay = parent_request->prop_speed * this->dist;
+			this->total_delay = this->trans_delay * this->prop_delay;
+			this->info.push_back(vertexID);
+			this->info.push_back(double_to_string(trans_delay));
+			this->info.push_back(double_to_string(prop_delay));
+			this->info.push_back(double_to_string(total_delay));
+		}
+		double dist;
+		double trans_delay;
+		double prop_delay;
+		double total_delay;
+		vector<string> info;
+		request_params* parent_request;
+		string vertexID;
+	};
+	vector<Node*> nodes;
+	request_params()
+	{
+		vector<string> output = delimit(from_cstring(buf), ' ');
+		this->file_size = string_to_int(output[0]);
+		this->mapID = output[1];
+		this->num_v = string_to_int(output[2]);
+		this->num_e = string_to_int(output[3]);
+		this->prop_speed = stod(output[4]);
+		this->trans_speed = stod(output[5]);
+		this->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
+
+		for (std::pair<vector<string>::iterator, vector<string>::iterator>
+		        it(next(output.begin(), 6), next(output.begin(), 7));
+		        it.first != prev(output.end(), 2);
+		        it.first = next(it.first, 2), it.second = next(it.second, 2))
+		{
+			this->nodes.push_back(new Node(*it.first, stod(*it.second), this));
+		}
+
+	}
 	void set_info(vector<string> input)
 	{
 		copy(input.begin(), input.end(), back_inserter(this->info));
@@ -141,39 +194,10 @@ public:
 		cout << endl;
 		return;
 	}
-	int file_size;
-	string mapID;
-	int num_v;
-	int num_e;
-	double prop_speed;
-	double trans_speed;
-	vector<T> nodes;
-private:
-	vector<string> info;
-	string output;
+
 
 };
-class Node
-{
-public:
-	Node(string vertexID, double dist, request_params<Node*>* parent_request) : dist(dist), vertexID(vertexID), parent_request(parent_request)
-	{
-		this->trans_delay = parent_request->trans_speed * parent_request->file_size;
-		this->prop_delay = parent_request->prop_speed * this->dist;
-		this->total_delay = this->trans_delay * this->prop_delay;
-		this->info.push_back(vertexID);
-		this->info.push_back(double_to_string(trans_delay));
-		this->info.push_back(double_to_string(prop_delay));
-		this->info.push_back(double_to_string(total_delay));
-	}
-	double dist;
-	double trans_delay;
-	double prop_delay;
-	double total_delay;
-	vector<string> info;
-	request_params<Node*>* parent_request;
-	string vertexID;
-};
+
 int next_index(char* buf, int start, int size)
 {
 	for (int i = start; i < size; i++)
@@ -193,202 +217,128 @@ void* get_in_addr(struct sockaddr* sa)
 	}
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-int udp_listen(request_params<Node*>* incoming_request, bool boot_up)
+class UDP
 {
-	/*
-	bool debug = 0;
-	if (debug)
+public:
+	struct addrinfo hints, *my_address, *servinfo, *AWS_address;
+	int sock_fd, init_rv = 0;
+	map<string, addrinfo*> addresses;
+	UDP()
 	{
-		char* buf = "20 A 6 5 1.000000 2.000000 0 24 1 31 2 0 3 15 4 20 5 22 ";
-
-		vector<string> output = delimit(from_cstring(buf), ' ');
-		cout << "OUTPUT" << endl;
-		for (auto entry : output)
+		cout << "enter UDP init" << endl;
+		memset(&this->hints, 0, sizeof this->hints);
+		this->hints.ai_family = AF_INET;
+		this->hints.ai_socktype = SOCK_DGRAM;
+		int rv;
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(MYPORT), &(this->hints), &(this->servinfo))) != 0)
 		{
-			cout << entry << endl;
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
 		}
-		incoming_request->file_size = string_to_int(output[0]);
-		incoming_request->mapID = output[1];
-		incoming_request->num_v = string_to_int(output[2]);
-		incoming_request->num_e = string_to_int(output[3]);
-		incoming_request->prop_speed = stod(output[4]);
-		incoming_request->trans_speed = stod(output[5]);
-		incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
-		for (std::pair<vector<string>::iterator, vector<string>::iterator>
-		        it(next(output.begin(), 6), next(output.begin(), 7));
-		        it.first != prev(output.end(), 2);
-		        it.first = next(it.first, 2), it.second = next(it.second, 2))
-			//advance(it.first, 2), advance(it.second, 2))
+		for (my_address = servinfo; my_address != NULL; my_address = my_address->ai_next)
 		{
-			incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
+
+			if ((sock_fd = socket(my_address->ai_family, my_address->ai_socktype,
+			                      my_address->ai_protocol)) == -1)
+			{
+				perror("listener: socket");
+				continue;
+			}
+
+			if (::bind(sock_fd, my_address->ai_addr, my_address->ai_addrlen) == -1)
+			{
+				close(sock_fd);
+				perror("listener: bind");
+				continue;
+			}
+
+
+			break;
+		}
+		if (my_address == NULL)
+		{
+			fprintf(stderr, "listener: failed to bind socket\n");
+			init_rv = 2;
+		}
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(AWS), &hints, &AWS_address)) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		addresses.insert({"me", my_address});
+		addresses.insert({"aws", AWS_address});
+		cout << "exit udp_init" << endl;
+
+	}
+	int send(string server_ID, char* message, int message_size)
+	{
+		message[message_size] = '\0';
+		int numbytes;
+		struct addrinfo* p = addresses[server_ID];
+		if ((numbytes = sendto(this->sock_fd, message, message_size, 0,
+		                       p->ai_addr, p->ai_addrlen)) == -1)
+		{
+			perror("talker: sendto");
+			exit(1);
+			return 1;
 		}
 
+
+		printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
 		return 0;
 	}
-	*/
-	//from beej
-	//********************************
-	int sockfd;
-	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
-	struct sockaddr_storage their_addr;
-	char buf[MAXBUFLEN];
-	socklen_t addr_len;
-	char s[INET6_ADDRSTRLEN];
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE; // use my IP
-
-	if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0)
+	int recieve()
 	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and bind to the first we can
-	for (p = servinfo; p != NULL; p = p->ai_next)
-	{
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-		                     p->ai_protocol)) == -1)
+		int rv;
+		int numbytes;
+		struct sockaddr_storage their_addr;
+		//char buf[MAXBUFLEN];
+		socklen_t addr_len;
+		char s[INET6_ADDRSTRLEN];
+		addr_len = sizeof their_addr;
+		if ((numbytes = recvfrom(sock_fd, buf, MAXBUFLEN - 1 , 0,
+		                         (struct sockaddr*)&their_addr, &addr_len)) == -1)
 		{
-			perror("listener: socket");
-			continue;
-		}
-		if (::bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-		{
-			close(sockfd);
-			perror("listener: bind");
-			continue;
+			perror("recvfrom");
+			exit(1);
+			return 1;
 		}
 
-
-		break;
+		printf("listener: got packet from %s\n",
+		       inet_ntop(their_addr.ss_family,
+		                 get_in_addr((struct sockaddr*)&their_addr),
+		                 s, sizeof s));
+		printf("listener: packet is %d bytes long\n", numbytes);
+		buf[numbytes] = '\0';
+		printf("listener: packet contains \"%s\"\n", buf);
+		cout << "exit udp listen" << endl;
+		return 0;
 	}
 
-	if (p == NULL)
+	~UDP()
 	{
-		fprintf(stderr, "listener: failed to bind socket\n");
-		return 2;
-	}
-
-	freeaddrinfo(servinfo);
-
-	if (boot_up)
-	{
-		printf("The Server B is up and running using UDP on port %s", to_cstring(MYPORT));
-	}
-	else {} //do something here
-
-	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1 , 0,
-	                         (struct sockaddr*)&their_addr, &addr_len)) == -1)
-	{
-		perror("recvfrom");
-		exit(1);
-	}
-
-	printf("listener: got packet from %s\n",
-	       inet_ntop(their_addr.ss_family,
-	                 get_in_addr((struct sockaddr*)&their_addr),
-	                 s, sizeof s));
-	printf("listener: packet is %d bytes long\n", numbytes);
-	buf[numbytes] = '\0';
-	printf("listener: packet contains \"%s\"\n", buf);
-
-
-	close(sockfd);
-	//********************************
-	vector<string> output = delimit(from_cstring(buf), ' ');
-	incoming_request->file_size = string_to_int(output[0]);
-	incoming_request->mapID = output[1];
-	incoming_request->num_v = string_to_int(output[2]);
-	incoming_request->num_e = string_to_int(output[3]);
-	incoming_request->prop_speed = stod(output[4]);
-	incoming_request->trans_speed = stod(output[5]);
-	incoming_request->set_info(vector<string>(output.begin(), next(output.begin(), 5)));
-
-	for (std::pair<vector<string>::iterator, vector<string>::iterator>
-	        it(next(output.begin(), 6), next(output.begin(), 7));
-	        it.first != prev(output.end(), 2);
-	        it.first = next(it.first, 2), it.second = next(it.second, 2))
-	{
-		incoming_request->nodes.push_back(new Node(*it.first, stod(*it.second), incoming_request));
-	}
-
-	return 0;
-
-}
-int udp_send(char* message, char* port) //please dont forget terminating char
-{
-
-	int sockfd;
-	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
-
-	if (0) //(argc != 3)
-	{
-		fprintf(stderr, "usage: talker hostname message\n");
-		exit(1);
-	}
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	if ((rv = getaddrinfo(MYIPADDRESS, port, &hints, &servinfo)) != 0)
-	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and make a socket
-	for (p = servinfo; p != NULL; p = p->ai_next)
-	{
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-		                     p->ai_protocol)) == -1)
+		for (auto address : addresses)
 		{
-			perror("talker: socket");
-			continue;
+			freeaddrinfo(address.second);
 		}
+		close(sock_fd);
 
-		break;
 	}
+};
 
-	if (p == NULL)
-	{
-		fprintf(stderr, "talker: failed to create socket\n");
-		return 2;
-	}
-
-	if ((numbytes = sendto(sockfd, message, strlen(message), 0,
-	                       p->ai_addr, p->ai_addrlen)) == -1)
-	{
-		perror("talker: sendto");
-		exit(1);
-	}
-
-	freeaddrinfo(servinfo);
-
-	printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
-	close(sockfd);
-
-	return 0;
-}
 int main()
 {
 
-	request_params<Node*>* incoming_request = new request_params<Node*>;
-	udp_listen(incoming_request, true); //is this blocking?
+	//udp_listen(incoming_request, true); //is this blocking?
+
+	UDP udp;
+	udp.recieve();
+	request_params* incoming_request = new request_params();
 	//recieved data
 	cout << endl << "The Server B has recieved data for calculation:" << endl;
 	incoming_request->print_input();
 	incoming_request->print_output();
-	if (udp_send(to_cstring(incoming_request->get_output()), to_cstring(AWS))) {} //whoops
+	if (udp.send("aws", to_cstring(incoming_request->get_output()), incoming_request->get_output().size())) {} //whoops
+
 	cout << endl << "The Server B has finished sending the output to AWS" << endl;
-
-
 }

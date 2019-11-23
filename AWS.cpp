@@ -75,326 +75,280 @@ void* get_in_addr(struct sockaddr* sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-
-int tcp_recieve()
+class TCP
 {
-
-
-	int numbytes;  // listen on sock_fd, new connection on new_fd
+public:
+	int sock_fd_child, sock_fd_parent, numbytes, init_rv = 0;
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
 	struct sigaction sa;
-	int yes = 1;
 	char s[INET6_ADDRSTRLEN];
-	int rv;
-	//char buf[MAXDATASIZE];
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE; // use my IP
-
-	if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0)
+	int rv, yes = 1;
+	TCP()
 	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and bind to the first we can
-	for (p = servinfo; p != NULL; p = p->ai_next)
-	{
-		if ((fd.tcp_parent = socket(p->ai_family, p->ai_socktype,
-		                            p->ai_protocol)) == -1)
+		memset(&hints, 0, sizeof hints);
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE; // use my IP
+		if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0)
 		{
-			perror("server: socket");
-			continue;
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
 		}
-
-		if (setsockopt(fd.tcp_parent, SOL_SOCKET, SO_REUSEADDR, &yes,
-		               sizeof(int)) == -1)
-		{
-			perror("setsockopt");
-			exit(1);
-		}
-
-		if (::bind(fd.tcp_parent, p->ai_addr, p->ai_addrlen) == -1)
-		{
-			close(fd.tcp_parent);
-			perror("server: bind");
-			continue;
-		}
-
-		break;
-	}
-
-	freeaddrinfo(servinfo); // all done with this structure
-
-	if (p == NULL)
-	{
-		fprintf(stderr, "server: failed to bind\n");
-		exit(1);
-	}
-
-	if (listen(fd.tcp_parent, BACKLOG) == -1)
-	{
-		perror("listen");
-		exit(1);
-	}
-
-	sa.sa_handler = sigchld_handler; // reap all dead processes
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	if (sigaction(SIGCHLD, &sa, NULL) == -1)
-	{
-		perror("sigaction");
-		exit(1);
-	}
-
-	printf("server: waiting for connections...\n");
-
-	while (1)   // main accept() loop
-	{
-		sin_size = sizeof their_addr;
-		fd.tcp_child = accept(fd.tcp_parent, (struct sockaddr*)&their_addr, &sin_size);
-		if (fd.tcp_child == -1)
-		{
-			perror("accept");
-			continue;
-		}
-
-		inet_ntop(their_addr.ss_family,
-		          get_in_addr((struct sockaddr*)&their_addr),
-		          s, sizeof s);
-		printf("server: got connection from %s\n", s);
-		if (!fork())   // this is the child process
-		{
-			close(fd.tcp_parent); // child doesn't need the listener
-			//added
-			cout << "inside fork" << endl;
-			if ((numbytes = recv(fd.tcp_child, buf, MAXDATASIZE - 1, 0)) == -1)
-			{
-				perror("recv");
-				exit(1);
-			}
-			buf[numbytes] = '\0';
-			printf("host: received '%s'\n", buf);
-
-			//close(new_fd);
-			//exit(0);
-
-			return 0;
-		}
-		close(fd.tcp_child);  // parent doesn't need this
-	}
-
-	return 0;
-
-
-}
-
-int tcp_send()
-{
-	while (1)
-	{
-		if (!fork())
-		{
-			if (send(fd.tcp_child, buf, 100, 0) == -1)
-				perror("send");
-			close(fd.tcp_child);
-			return 0;
-		}
-	}
-	close(fd.tcp_child);
-	return 0;
-}
-struct UDP
-{
-	struct addrinfo hints, *servinfo, *p;
-};
-UDP udp;
-
-//****************
-int udp_init()
-{
-	cout << "enter udp init" << endl;
-	memset(&udp.hints, 0, sizeof udp.hints);
-	udp.hints.ai_family = AF_UNSPEC;
-	udp.hints.ai_socktype = SOCK_DGRAM;
-	udp.hints.ai_flags = AI_PASSIVE; // use my IP
-	int rv;
-
-	if ((rv = getaddrinfo(NULL, to_cstring(MYPORT), &udp.hints, &udp.servinfo)) != 0)
-	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-	for (udp.p = udp.servinfo; udp.p != NULL; udp.p = udp.p->ai_next)
-	{
-
-		if ((fd.udp = socket(udp.p->ai_family, udp.p->ai_socktype,
-		                     udp.p->ai_protocol)) == -1)
-		{
-			perror("listener: socket");
-			continue;
-		}
-
-		if (::bind(fd.udp, udp.p->ai_addr, udp.p->ai_addrlen) == -1)
-		{
-			close(fd.udp);
-			perror("listener: bind");
-			continue;
-		}
-
-
-		break;
-	}
-	if (udp.p == NULL)
-	{
-		fprintf(stderr, "listener: failed to bind socket\n");
-		return 2;
-	}
-	cout << "exit udp_init" << endl;
-	return 0;
-
-}
-void udp_td()
-{
-	close(fd.udp);
-	freeaddrinfo(udp.servinfo);
-}
-
-int udp_send(char* message, char* port) //please dont forget terminating char
-{
-
-	cout << "enter udp talk" << endl;
-	//int fd.udp;
-
-	int rv;
-	int numbytes;
-	struct addrinfo hints, *servinfo, *p;
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-
-
-	if ((rv = getaddrinfo(MYIPADDRESS, port, &hints, &servinfo)) != 0)
-	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-	p = servinfo;
-	// loop through all the results and make a socket
-	/*
-	if (do_better)
-	{
+		// loop through all the results and bind to the first we can
 		for (p = servinfo; p != NULL; p = p->ai_next)
 		{
-			if ((fd.udp = socket(p->ai_family, p->ai_socktype,
-			                     p->ai_protocol)) == -1)
+			if ((sock_fd_parent = socket(p->ai_family, p->ai_socktype,
+			                             p->ai_protocol)) == -1)
 			{
-				perror("talker: socket");
+				perror("server: socket");
+				continue;
+			}
+
+			if (setsockopt(sock_fd_parent, SOL_SOCKET, SO_REUSEADDR, &yes,
+			               sizeof(int)) == -1)
+			{
+				perror("setsockopt");
+				exit(1);
+			}
+
+			if (::bind(sock_fd_parent, p->ai_addr, p->ai_addrlen) == -1)
+			{
+				close(sock_fd_parent);
+				perror("server: bind");
 				continue;
 			}
 
 			break;
 		}
-		do_better = 0;
+
+		freeaddrinfo(servinfo); // all done with this structure
+
+		if (p == NULL)
+		{
+			fprintf(stderr, "server: failed to bind\n");
+			exit(1);
+		}
+
+		if (::listen(sock_fd_parent, BACKLOG) == -1)
+		{
+			perror("listen");
+			exit(1);
+		}
+
+		sa.sa_handler = sigchld_handler; // reap all dead processes
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = SA_RESTART;
+		if (sigaction(SIGCHLD, &sa, NULL) == -1)
+		{
+			perror("sigaction");
+			exit(1);
+		}
 	}
-
-
-	if (p == NULL)
+	int listen()
 	{
-		fprintf(stderr, "talker: failed to create socket\n");
-		return 2;
-	}
-	*/
+		printf("server: waiting for connections...\n");
 
-	if ((numbytes = sendto(fd.udp, message, strlen(message), 0,
-	                       p->ai_addr, p->ai_addrlen)) == -1)
+		while (1)   // main accept() loop
+		{
+			sin_size = sizeof their_addr;
+			sock_fd_child = accept(sock_fd_parent, (struct sockaddr*)&their_addr, &sin_size);
+			if (sock_fd_child == -1)
+			{
+				perror("accept");
+				continue;
+			}
+
+			inet_ntop(their_addr.ss_family,
+			          get_in_addr((struct sockaddr*)&their_addr),
+			          s, sizeof s);
+			printf("server: got connection from %s\n", s);
+			if (!fork())   // this is the child process
+			{
+				//close(sock_fd_parent); // child doesn't need the listener
+				//added
+				cout << "inside fork" << endl;
+				if ((numbytes = recv(sock_fd_child, buf, MAXDATASIZE - 1, 0)) == -1)
+				{
+					perror("recv");
+					exit(1);
+					return 1;
+				}
+				buf[numbytes] = '\0';
+				printf("host: received '%s'\n", buf);
+
+				return numbytes;
+			}
+			close(sock_fd_child);  // parent doesn't need this
+		}
+
+		return 0;
+	}
+
+	int talk(int message_size)
 	{
-		perror("talker: sendto");
-		exit(1);
+		buf[message_size] = '\0';
+		while (1)
+		{
+			if (!fork())
+			{
+				if (::send(sock_fd_child, buf, 100, 0) == -1)
+					perror("send");
+				close(sock_fd_child);
+				return 0;
+			}
+		}
+		return 0;
+		close(sock_fd_child);
+	}
+	void block()
+	{
+		while (true)
+		{
+			if ((numbytes = recv(sock_fd_child, buf, MAXDATASIZE - 1, 0)) == -1)
+			{
+				break;
+			}
+		}
+	}
+	~TCP()
+	{
+		close(sock_fd_parent);
 	}
 
-	freeaddrinfo(servinfo);
-
-	printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
-	//close(fd.udp);
-	cout << "exit udp talk" << endl;
-	return 0;
-}
-
-int udp_listen()
+};
+class UDP
 {
-	cout << "enter udp listen" << endl;
-	//from beej
-	//********************************
-	//int fd.udp;
-	//struct addrinfo hints, *servinfo, *p;
-	int rv;
-	int numbytes;
-	struct sockaddr_storage their_addr;
-	//char buf[MAXBUFLEN];
-	socklen_t addr_len;
-	char s[INET6_ADDRSTRLEN];
-
-	//memset(&hints, 0, sizeof hints);
-	//hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
-	//hints.ai_socktype = SOCK_DGRAM;
-	//hints.ai_flags = AI_PASSIVE; // use my IP
-
-
-
-	// loop through all the results and bind to the first we can
-
-	printf("listener: waiting to recvfrom...\n");
-
-	addr_len = sizeof their_addr;
-	if ((numbytes = recvfrom(fd.udp, buf, MAXBUFLEN - 1 , 0,
-	                         (struct sockaddr*)&their_addr, &addr_len)) == -1)
+public:
+	struct addrinfo hints, *my_address, *servinfo, *A_address, *B_address;
+	int sock_fd, init_rv = 0;
+	map<string, addrinfo*> addresses;
+	UDP()
 	{
-		perror("recvfrom");
-		exit(1);
+		cout << "enter UDP init" << endl;
+		memset(&this->hints, 0, sizeof this->hints);
+		this->hints.ai_family = AF_INET;
+		this->hints.ai_socktype = SOCK_DGRAM;
+		int rv;
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(MYPORT), &(this->hints), &(this->servinfo))) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		for (my_address = servinfo; my_address != NULL; my_address = my_address->ai_next)
+		{
+
+			if ((sock_fd = socket(my_address->ai_family, my_address->ai_socktype,
+			                      my_address->ai_protocol)) == -1)
+			{
+				perror("listener: socket");
+				continue;
+			}
+
+			if (::bind(sock_fd, my_address->ai_addr, my_address->ai_addrlen) == -1)
+			{
+				close(sock_fd);
+				perror("listener: bind");
+				continue;
+			}
+
+
+			break;
+		}
+		if (my_address == NULL)
+		{
+			fprintf(stderr, "listener: failed to bind socket\n");
+			init_rv = 2;
+		}
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(SERVERA), &hints, &A_address)) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(SERVERB), &hints, &B_address)) != 0)
+		{
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+			init_rv = 1;
+		}
+		addresses.insert({"A", A_address});
+		addresses.insert({"B", B_address});
+		addresses.insert({"me", my_address});
+		cout << "exit udp_init" << endl;
+
+	}
+	int send(string server_ID, int message_size)
+	{
+		buf[message_size] = '\0';
+		int numbytes;
+		struct addrinfo* p = addresses[server_ID];
+		if ((numbytes = sendto(this->sock_fd, buf, strlen(buf), 0,
+		                       p->ai_addr, p->ai_addrlen)) == -1)
+		{
+			perror("talker: sendto");
+			exit(1);
+			return 1;
+		}
+
+
+		printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
+		return 0;
+	}
+	int recieve()
+	{
+		int rv;
+		int numbytes;
+		struct sockaddr_storage their_addr;
+		//char buf[MAXBUFLEN];
+		socklen_t addr_len;
+		char s[INET6_ADDRSTRLEN];
+		addr_len = sizeof their_addr;
+		if ((numbytes = recvfrom(sock_fd, buf, MAXBUFLEN - 1 , 0,
+		                         (struct sockaddr*)&their_addr, &addr_len)) == -1)
+		{
+			perror("recvfrom");
+			exit(1);
+			return 1;
+		}
+
+
+		printf("listener: got packet from %s\n",
+		       inet_ntop(their_addr.ss_family,
+		                 get_in_addr((struct sockaddr*)&their_addr),
+		                 s, sizeof s));
+		printf("listener: packet is %d bytes long\n", numbytes);
+		buf[numbytes] = '\0';
+		printf("listener: packet contains \"%s\"\n", buf);
+		cout << "exit udp listen" << endl;
+		return numbytes;
 	}
 
-	printf("listener: got packet from %s\n",
-	       inet_ntop(their_addr.ss_family,
-	                 get_in_addr((struct sockaddr*)&their_addr),
-	                 s, sizeof s));
-	printf("listener: packet is %d bytes long\n", numbytes);
-	buf[numbytes] = '\0';
-	cout << "does null terminator still exist? " << buf[numbytes - 1] << " " << buf[numbytes] << endl;
-	printf("listener: packet contains \"%s\"\n", buf);
-	//close(fd.udp);
-	//********************************
-	cout << "exit udp listen" << endl;
-	return 0;
+	~UDP()
+	{
+		for (auto address : addresses)
+		{
+			freeaddrinfo(address.second);
+		}
+		close(sock_fd);
+	}
+};
 
-}
+
 
 int main()
 {
+	int message_size = 0;
+	TCP tcp;
+	UDP udp;
 	while (true)
 	{
-		//if (tcp_init()) {}
-		if (tcp_recieve()) {} //whoopss
-		if (udp_init()) {}
-		if (udp_send(buf, to_cstring(SERVERA))) {} //
-		//if (udp_send(to_cstring("A 2 20"), to_cstring(SERVERA))) {} //whoops
-		if (udp_listen()) {} //whoops
-		cout << "inside main" << endl;
-		if (udp_send(buf, to_cstring(SERVERB))) {} //whoops
-		if (udp_listen()) {} //whoops
-		if (tcp_send()) {}
-		while (recv(fd.tcp_child, NULL, 1, MSG_PEEK | MSG_DONTWAIT) != 0)
-		{
-			sleep(rand() % 2); // Sleep for a bit to avoid spam
-			fflush(stdin);
-			printf("I am alive: %d\n", fd.tcp_child); //delette me
-		}
-		udp_td();
+		message_size = tcp.listen();
+		if (udp.send("A", message_size)) {}
+		message_size = udp.recieve();
+		if (udp.send("B", message_size)) {}
+		message_size = udp.recieve();
+		if (tcp.talk(message_size)) {}
+		tcp.block();
 	}
 
 	return 0;
