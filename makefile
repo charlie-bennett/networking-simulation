@@ -1,14 +1,28 @@
 CC:=g++
-CFLAGS +=g++ -std=c++14 -Wall -Wextra -pedantic-errors -pthread
-LFLAGS = -pthread
+CFLAGS += g++ -std=c++11 -Wall
+
+objects = serverA.o serverB.o aws.o client.o
+
 all: 
-	g++ -std=c++11 serverA.cpp -o A
-	g++ -std=c++11 serverB.cpp -o B
-	g++ -std=c++11 client.cpp -o client
-	g++ -lpthread -std=c++11 AWS.cpp -o aws 
+	$(CFLAGS) serverA.cpp -o serverA
+	$(CFLAGS) serverB.cpp -o serverB
+	$(CFLAGS) aws.cpp -o aws 
+	$(CFLAGS) client.cpp -o client
+
+serverA:
+	$(CFLAGS) serverA.cpp -o serverA
+
+serverB:
+	$(CFLAGS) serverB.cpp -o serverB
+
+aws:
+	$(CFLAGS) aws.cpp -o aws
+
+client:
+	$(CFLAGS) client.cpp -o client
 
 clean: 
-	$(RM) aws
 	$(RM) client
-	$(RM) A
-	$(RM) B
+	$(RM) aws
+	$(RM) serverA
+	$(RM) serverB

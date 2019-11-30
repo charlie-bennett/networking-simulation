@@ -15,11 +15,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <signal.h>
+#include <sstream>
 #include <sys/wait.h>
 #define MYPORT "23095"
 #define SERVERA "21095"    // the port users will be connecting to
 #define SERVERB "22095"
-#define MAXBUFLEN 100000
+#define MAXBUFLEN 10000
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
@@ -27,12 +28,36 @@ using namespace std;
 //TODO: Make helper funciton.h
 //TODO: CHILD SOCKETS
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#define MAXDATASIZE 1000 // max number of bytes we can get at once
 char buf[MAXBUFLEN];
 
 int new_fd;
 bool do_better = 1;
 
+vector<string> delimit(string input, char delimiter, int max_size = RELINF)
+{
+	vector<string> output;
+	string::iterator head = input.begin();
+	for (string::iterator tail = input.begin(); tail != input.end(); ++tail)
+	{
+		char word = *tail;
+		if (word == delimiter)
+		{
+			if (head != tail) output.push_back(string(head, tail));
+			head = next(tail, 1);
+			if (output.size() == max_size)
+			{
+				return output;
+			}
+		}
+	}
+	//add last element
+	if (*prev(input.end(), 1) != ' ')
+	{
+		output.push_back(string(head, input.end()));
+	}
+	return output;
+}
 struct file_descriptor
 {
 	int tcp_parent;
@@ -41,7 +66,12 @@ struct file_descriptor
 };
 file_descriptor fd;
 
-
+string from_cstring(char* input)
+{
+	string output;
+	output += input;
+	return output;
+}
 
 char* to_cstring(string input)
 {
@@ -49,6 +79,7 @@ char* to_cstring(string input)
 	for (int i = 0; i < input.size(); i++)
 	{
 		output[i] = input[i];
+		if (input[i] == '/0') return output;
 	}
 	return output;
 }
@@ -65,6 +96,36 @@ void sigchld_handler(int s)
 //the following is from Beej guid
 //************
 // get sockaddr, IPv4 or IPv6:
+void print_matrix(vector<string> data, vector<int> widths)
+{
+	vector<string>::iterator iter = data.begin();
+	while (iter != data.end())
+	{
+		for (auto width : widths)
+		{
+
+			if (iter->size() > width)
+			{
+				//asume number
+				cout << *iter << endl;
+				long double number = stold(to_cstring(*iter));
+				std::ostringstream mystream;
+				mystream << std::setprecision(5) << number;
+				string new_number = mystream.str();
+				cout << std::setw(width) << std::setfill(' ') << std::left << new_number;
+
+			}
+
+
+			else cout << std::setw(width) << std::setfill(' ') << std::left << *iter;
+			std::advance(iter, 1);
+		}
+		cout << endl;
+	}
+
+
+	return;
+}
 void* get_in_addr(struct sockaddr* sa)
 {
 	if (sa->sa_family == AF_INET)
@@ -164,6 +225,7 @@ public:
 			          get_in_addr((struct sockaddr*)&their_addr),
 			          s, sizeof s);
 			printf("server: got connection from %s\n", s);
+			/*
 			if (!fork())   // this is the child process
 			{
 				//close(sock_fd_parent); // child doesn't need the listener
@@ -180,7 +242,22 @@ public:
 
 				return numbytes;
 			}
+			*/
+			//close(sock_fd_parent); // child doesn't need the listener
+			//added
+			cout << "inside fork" << endl;
+			if ((numbytes = recv(sock_fd_child, buf, MAXDATASIZE - 1, 0)) == -1)
+			{
+				perror("recv");
+				exit(1);
+				return 1;
+			}
+			buf[numbytes] = '\0';
+			printf("host: received '%s'\n", buf);
+
+			return numbytes;
 			close(sock_fd_child);  // parent doesn't need this
+
 		}
 
 		return 0;
@@ -191,6 +268,7 @@ public:
 		buf[message_size] = '\0';
 		while (1)
 		{
+			/*
 			if (!fork())
 			{
 				if (::send(sock_fd_child, buf, 100, 0) == -1)
@@ -198,6 +276,11 @@ public:
 				close(sock_fd_child);
 				return 0;
 			}
+			*/
+			if (::send(sock_fd_child, buf, message_size, 0) == -1)
+				perror("send");
+			close(sock_fd_child);
+			return 0;
 		}
 		return 0;
 		close(sock_fd_child);
@@ -340,14 +423,58 @@ int main()
 	int message_size = 0;
 	TCP tcp;
 	UDP udp;
+	int count = 0;
+	vector<int> widths;
+	cout << "The AWS is up and running." << endl;
 	while (true)
 	{
 		message_size = tcp.listen();
+		vector<string> input = delimit(from_cstring(buf), ' ');
+		printf("The AWS has recieved MAP ID %s, start vertex %s /n", to_cstring(input[0]), to_cstring(input[1]));
+		printf("and file size %s from the client using TCP \n", to_cstring(input[2]));
+		printf("over port %s \n", to_cstring(MYPORT));
 		if (udp.send("A", message_size)) {}
+		printf("The AWS has sent map ID and starting vertex to serer A using UPD over port %s\n",
+		       to_cstring(SERVERA));
+
 		message_size = udp.recieve();
+		cout << "The AWS has has recieved the shortest path from server A: " << endl;
+		cout << "---------------------------------" << endl;
+		cout << "Destination      Min Length      " << endl;
+		cout << "---------------------------------" << endl;
+		widths.clear();
+		widths.push_back(string("Destination      ").size());
+		widths.push_back(string("Min Length      ").size());
+		input = delimit(from_cstring(buf), ' ');
+		print_matrix(vector<string>(input.begin() + 6, input.end()), widths);
+		cout << "---------------------------------" << endl;
 		if (udp.send("B", message_size)) {}
+		cout << "The AWS has sent path length, propagatin speed and transmission speed" << endl;
+		cout << "to server B using UDP over port " << SERVERB << endl;
 		message_size = udp.recieve();
+		cout << "The AWS has recieved delays from server B" << endl;
+		cout << "-----------------------------------------" << endl;
+		cout << "Destination      Tt      Tp      Delay   " << endl;
+		cout << "-----------------------------------------" << endl;
+		widths.clear();
+		widths.push_back(string("Destination      ").size());
+		widths.push_back(string("Tt      ").size());
+		widths.push_back(string("Tp      ").size());
+		widths.push_back(string("Delay   ").size());
+		input = delimit(from_cstring(buf), ' ');
+		input = vector<string>(input.begin() + 6, input.end());
+		count = 0;
+		for (vector<string>::iterator it = input.begin(); it != input.end(); ++it)
+		{
+			if (count % 5 == 1) input.erase(it);
+			count++;
+		}
+		print_matrix(input, widths);
+		cout << "-----------------------------------------" << endl;
+		cout << "The AWS has sent calculated dleay to client using TCP over port %s\n" << MYPORT << endl;
+
 		if (tcp.talk(message_size)) {}
+		cout << "The AWS has sent calculated dleay to client using TCP over port %s\n" << MYPORT << endl;
 		tcp.block();
 	}
 

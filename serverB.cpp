@@ -18,13 +18,13 @@
 #include <sstream>
 #define MYPORT "22095"
 #define AWS "23095"   // the port users will be connecting to
-#define MAXBUFLEN 100
+#define MAXBUFLEN 1000
 #define PRECISION 3
 using namespace std;
 #define RELINF 1000000
 #define MYIPADDRESS "127.0.0.1"
 char buf[MAXBUFLEN];
-int string_to_int(string me)
+int long long string_to_int(string me)
 {
 	char* output = new char[me.size()];
 	for ( int i = 0; i < me.size(); i++)
@@ -32,7 +32,7 @@ int string_to_int(string me)
 		output[i] =  me[i];
 	}
 
-	return atoi(output);
+	return atoll(output);
 }
 
 string double_to_string(double input)
@@ -45,6 +45,7 @@ string double_to_string(double input)
 
 }
 
+
 vector<string> delimit(string input, char delimiter, int max_size = RELINF)
 {
 	vector<string> output;
@@ -54,8 +55,7 @@ vector<string> delimit(string input, char delimiter, int max_size = RELINF)
 		char word = *tail;
 		if (word == delimiter)
 		{
-
-			output.push_back(string(head, tail));
+			if (head != tail) output.push_back(string(head, tail));
 			head = next(tail, 1);
 			if (output.size() == max_size)
 			{
@@ -86,6 +86,36 @@ string from_cstring(char* input)
 	output += input;
 	return output;
 }
+void print_matrix(vector<string> data, vector<int> widths)
+{
+	vector<string>::iterator iter = data.begin();
+	while (iter != data.end())
+	{
+		for (auto width : widths)
+		{
+
+			if (iter->size() > width)
+			{
+				//asume number
+				cout << *iter << endl;
+				long double number = stold(to_cstring(*iter));
+				std::ostringstream mystream;
+				mystream << std::setprecision(5) << number;
+				string new_number = mystream.str();
+				cout << std::setw(width) << std::setfill(' ') << std::left << new_number;
+
+			}
+
+
+			else cout << std::setw(width) << std::setfill(' ') << std::left << *iter;
+			std::advance(iter, 1);
+		}
+		cout << endl;
+	}
+
+
+	return;
+}
 //template<class T>
 class request_params
 {
@@ -93,7 +123,7 @@ private:
 	vector<string> info;
 	string output;
 public:
-	int file_size;
+	int long long file_size;
 	string mapID;
 	int num_v;
 	int num_e;
@@ -105,10 +135,11 @@ public:
 	public:
 		Node(string vertexID, double dist, request_params* parent_request) : dist(dist), vertexID(vertexID), parent_request(parent_request)
 		{
-			this->trans_delay = parent_request->trans_speed * parent_request->file_size;
-			this->prop_delay = parent_request->prop_speed * this->dist;
-			this->total_delay = this->trans_delay * this->prop_delay;
+			this->trans_delay = double(parent_request->file_size) / (parent_request->trans_speed * 8);
+			this->prop_delay = this->dist / parent_request->prop_speed;
+			this->total_delay = this->trans_delay + this->prop_delay;
 			this->info.push_back(vertexID);
+			this->info.push_back(double_to_string(this->dist)); //newly added
 			this->info.push_back(double_to_string(trans_delay));
 			this->info.push_back(double_to_string(prop_delay));
 			this->info.push_back(double_to_string(total_delay));
@@ -183,13 +214,21 @@ public:
 	{
 		for (int i = 0; i < 50; i++) cout << "-";
 		cout << endl;
-		cout << "Destination Delay" << endl;
+		cout << "Destination     Delay    " << endl;
+		vector<int> widths;
+		widths.push_back(string("Destination     ").size());
+		widths.push_back(string("Delay    ").size());
 		for (int i = 0; i < 50; i++) cout << "-";
 		cout << endl;
+		vector<string> for_grid;
 		for (auto node : this->nodes)
 		{
-			cout << node->vertexID << std::setw(strlen("Destination")) << node->total_delay << endl;
+			for_grid.push_back(node->vertexID);
+			for_grid.push_back(double_to_string(node->total_delay));
+			//cout << node->vertexID << std::setw(strlen("Destination")) << node->total_delay << endl;
 		}
+		print_matrix(for_grid, widths);
+
 		for (int i = 0; i < 50; i++) cout << "-";
 		cout << endl;
 		return;
@@ -198,17 +237,7 @@ public:
 
 };
 
-int next_index(char* buf, int start, int size)
-{
-	for (int i = start; i < size; i++)
-	{
-		if (buf[i] == '|')
-		{
-			return i + 2;
-		}
-	}
-	return -1;
-}
+
 void* get_in_addr(struct sockaddr* sa)
 {
 	if (sa->sa_family == AF_INET)
@@ -322,23 +351,24 @@ public:
 			freeaddrinfo(address.second);
 		}
 		close(sock_fd);
-
 	}
 };
 
 int main()
 {
-
-	//udp_listen(incoming_request, true); //is this blocking?
-
 	UDP udp;
-	udp.recieve();
-	request_params* incoming_request = new request_params();
-	//recieved data
-	cout << endl << "The Server B has recieved data for calculation:" << endl;
-	incoming_request->print_input();
-	incoming_request->print_output();
-	if (udp.send("aws", to_cstring(incoming_request->get_output()), incoming_request->get_output().size())) {} //whoops
+	cout << "The Server B is up and running using UDP on port " << MYPORT << endl;
+	while (1)
+	{
+		udp.recieve();
+		request_params* incoming_request = new request_params();
+		//recieved data
+		cout << endl << "The Server B has recieved data for calculation:" << endl;
+		incoming_request->print_input();
+		cout << "The Server B has finished the calculation of the delays: " << endl;
+		incoming_request->print_output();
+		if (udp.send("aws", to_cstring(incoming_request->get_output()), incoming_request->get_output().size())) {} //whoops
 
-	cout << endl << "The Server B has finished sending the output to AWS" << endl;
+		cout << endl << "The Server B has finished sending the output to AWS" << endl;
+	}
 }

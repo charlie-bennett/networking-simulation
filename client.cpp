@@ -12,12 +12,50 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <string>
+#include<iostream>
+#include <vector>
+#include <sstream>
+#include <iomanip>
 
 #include <arpa/inet.h>
 
 #define PORT "23095" // the port client will be connecting to 
-#define MAXDATASIZE 100 // max number of bytes we can get at once 
+#define MAXDATASIZE 1000 // max number of bytes we can get at once 
 using namespace std;
+#define RELINF 1000000
+
+
+string from_cstring(char* input)
+{
+	string output;
+	output += input;
+	return output;
+}
+
+vector<string> delimit(string input, char delimiter, int max_size = RELINF)
+{
+	vector<string> output;
+	string::iterator head = input.begin();
+	for (string::iterator tail = input.begin(); tail != input.end(); ++tail)
+	{
+		char word = *tail;
+		if (word == delimiter)
+		{
+			if (head != tail) output.push_back(string(head, tail));
+			head = next(tail, 1);
+			if (output.size() == max_size)
+			{
+				return output;
+			}
+		}
+	}
+	//add last element
+	if (*prev(input.end(), 1) != ' ')
+	{
+		output.push_back(string(head, input.end()));
+	}
+	return output;
+}
 
 char* to_cstring(string input)
 {
@@ -27,6 +65,29 @@ char* to_cstring(string input)
 		output[i] = input[i];
 	}
 	return output;
+}
+
+void print_matrix(vector<string> data, vector<int> widths)
+{
+	vector<string>::iterator iter = data.begin();
+	while (iter != data.end())
+	{
+		for (auto width : widths)
+		{
+			if (iter->size() > width)
+			{
+				//asume number
+				long double number = stold(to_cstring(*iter));
+				std::ostringstream mystream;
+				mystream << std::setprecision(5) << number;
+				string new_number = mystream.str();
+				cout << std::setw(width) << std::setfill(' ') << std::left << new_number;
+			}
+			else cout << std::setw(width) << std::setfill(' ') << std::left << *iter;
+			std::advance(iter, 1);
+		}
+		cout << endl;
+	}
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -39,9 +100,24 @@ void* get_in_addr(struct sockaddr* sa)
 
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
+int get_port(struct sockaddr* sa)
+{
+	if (sa->sa_family == AF_INET)
+	{
+		return (((struct sockaddr_in*)sa)->sin_port);
+	}
+
+	return (((struct sockaddr_in6*)sa)->sin6_port);
+}
 
 int main(int argc, char* argv[])
 {
+	if (argc != 4)
+	{
+		printf("Error: Expexted 3 arguements, recieved %i", argc);
+		return 1;
+	}
+	cout << "The Client is up and running." << endl;
 	int sockfd, numbytes ;
 	char buf[MAXDATASIZE];
 	struct addrinfo hints, *servinfo, *p;
@@ -79,6 +155,7 @@ int main(int argc, char* argv[])
 		break;
 	}
 
+
 	if (p == NULL)
 	{
 		fprintf(stderr, "client: failed to connect\n");
@@ -87,7 +164,9 @@ int main(int argc, char* argv[])
 
 	inet_ntop(p->ai_family, get_in_addr((struct sockaddr*)p->ai_addr),
 	          s, sizeof s);
-	printf("client: connecting to %s\n", s);
+	auto getsock_check = getsockname(sockfd, (struct sockaddr*)get_in_addr((struct sockaddr*)p->ai_addr), (socklen_t*)&p->ai_addrlen);
+	//cout << (((struct sockaddr_in*)p->ai_addr)->sin_port) << endl;
+
 
 	freeaddrinfo(servinfo); // all done with this structure
 //TODO
@@ -101,11 +180,17 @@ int main(int argc, char* argv[])
 	{
 		perror("getsockname"); exit(1);
 	}
+	//use CONNECT MAYBE NOT BIND
 	*/
+
+
+	if (getsock_check == -1)
+	{
+		perror("getsockname"); exit(1);
+	}
 	string to_send;
 	for (int i = 1; i < argc; i++)
 	{
-
 		to_send += argv[i];
 		to_send += ' ';
 	}
@@ -113,6 +198,8 @@ int main(int argc, char* argv[])
 
 	if (send(sockfd, to_cstring(to_send), to_send.size(), 0) == -1)
 		perror("send");
+	printf("The client has sent query to AWS using TCP over \n port %i: start vertex %s; map %s; file size %s. \n",
+	       get_port(p->ai_addr), argv[2], argv[1], argv[3]);
 	while (1)
 	{
 		if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1)
@@ -120,12 +207,36 @@ int main(int argc, char* argv[])
 			perror("recv");
 			exit(1);
 		}
-		else if (numbytes > 1) break;
+
+		else if (numbytes > 1)
+		{
+			printf("listener: packet is %d bytes long\n", numbytes);
+			break;
+		}
 	}
 
 	buf[numbytes] = '\0';
+	cout << buf << endl;
+	vector<string> output = delimit(from_cstring(buf), ' ');
+	for (auto entry : output)
+	{
+		cout << entry << endl;
+	}
+	output = vector<string>(output.begin() + 5, output.end());
+	cout << "The client has recieved the results form AWS:" << endl;
+	cout << "-----------------------------------------------------------" << endl;
+	cout << "Destination    Min Length    Tt        Tp       Delay      " << endl;
+	cout << "-----------------------------------------------------------" << endl;
+	vector<int> widths;
+	widths.push_back(string("Destination    ").size());
+	widths.push_back(string("Min Length    ").size());
+	widths.push_back(string("Tt        ").size());
+	widths.push_back(string("Tp       ").size());
+	widths.push_back(string("Delay      ").size());
+	print_matrix(output, widths);
+	cout << "-----------------------------------------------------------" << endl;
 
-	printf("client: received '%s'\n", buf);
+
 
 	close(sockfd);
 
