@@ -79,7 +79,6 @@ void print_matrix(vector<string> data, vector<int> widths)
 			if (iter->size() > width)
 			{
 				//asume number
-				cout << *iter << endl;
 				long double number = stold(to_cstring(*iter));
 				std::ostringstream mystream;
 				mystream << std::setprecision(5) << number;
@@ -162,7 +161,6 @@ public:
 		vector<string> delimited = delimit(from_cstring(buf), ' ', 3);
 		mapID = delimited[0];
 		src = delimited[1];
-		cout << from_cstring(buf) << endl;
 		file_size = delimited[2];
 	}
 };
@@ -175,13 +173,12 @@ public:
 	map<string, addrinfo*> addresses;
 	UDP()
 	{
-		cout << "enter UDP init" << endl;
+
 		memset(&this->hints, 0, sizeof this->hints);
 		this->hints.ai_family = AF_INET;
 		this->hints.ai_socktype = SOCK_DGRAM;
 		int rv;
-		cout << to_cstring(MYPORT) << endl;
-		cout << to_cstring(MYIPADDRESS) << endl;
+
 
 		if ((rv = getaddrinfo(to_cstring(MYIPADDRESS), to_cstring(MYPORT), &(this->hints), &(this->servinfo))) != 0)
 		{
@@ -220,7 +217,7 @@ public:
 		}
 		addresses.insert({"me", my_address});
 		addresses.insert({"aws", AWS_address});
-		cout << "exit udp_init" << endl;
+
 
 	}
 	int send(string server_ID, char* message, int message_size)
@@ -236,8 +233,6 @@ public:
 			return 1;
 		}
 
-
-		printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
 		return 0;
 	}
 	int recieve()
@@ -256,15 +251,17 @@ public:
 			exit(1);
 			return 1;
 		}
+		/*
+				printf("listener: got packet from %s\n",
+				       inet_ntop(their_addr.ss_family,
+				                 get_in_addr((struct sockaddr*)&their_addr),
+				                 s, sizeof s));
+				printf("listener: packet is %d bytes long\n", numbytes);
 
-		printf("listener: got packet from %s\n",
-		       inet_ntop(their_addr.ss_family,
-		                 get_in_addr((struct sockaddr*)&their_addr),
-		                 s, sizeof s));
-		printf("listener: packet is %d bytes long\n", numbytes);
+				printf("listener: packet contains \"%s\"\n", buf);
+				cout << "exit udp listen" << endl;
+				*/
 		buf[numbytes] = '\0';
-		printf("listener: packet contains \"%s\"\n", buf);
-		cout << "exit udp listen" << endl;
 		return 0;
 	}
 
@@ -385,11 +382,13 @@ public:
 			graph[aliases[to]][aliases[from]] = cost;
 			graph[aliases[from]][aliases[to]] = cost;
 		}
+		/*
 		for (int i = 0; i < num_v; i++)
 		{
 			for (int j = 0; j < num_v; j++) cout << " " << graph[i][j];
 			cout << endl;
 		}
+		*/
 	}
 	string get_response(Request* incoming_request)
 	{
@@ -406,7 +405,6 @@ public:
 		response += " ";
 		response += trans_speed;
 		response += " ";
-		cout << "this is a ttest " << response << endl;
 		//print shortest path
 		cout << "The Server A has identified the following shortest paths:" << endl;
 		cout << endl;
@@ -567,7 +565,6 @@ int main()
 		{
 			printf("\n Error: %s not a valid source \n", to_cstring(incoming_request->src));
 		}
-		cout << incoming_request->src << " " << incoming_request->mapID;
 		cout << "Server A has recieved input for finding the shortest paths:" << endl;
 		cout << "starting vertex " << incoming_request->src << " of map " << incoming_request->mapID << endl;
 		response = map_of_maps[incoming_request->mapID]->get_response(incoming_request);

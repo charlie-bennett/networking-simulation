@@ -216,12 +216,14 @@ int main(int argc, char* argv[])
 	}
 
 	buf[numbytes] = '\0';
-	cout << buf << endl;
+
 	vector<string> output = delimit(from_cstring(buf), ' ');
+	/*
 	for (auto entry : output)
 	{
 		cout << entry << endl;
 	}
+	*/
 	output = vector<string>(output.begin() + 5, output.end());
 	cout << "The client has recieved the results form AWS:" << endl;
 	cout << "-----------------------------------------------------------" << endl;

@@ -40,6 +40,7 @@ vector<string> delimit(string input, char delimiter, int max_size = RELINF)
 	string::iterator head = input.begin();
 	for (string::iterator tail = input.begin(); tail != input.end(); ++tail)
 	{
+
 		char word = *tail;
 		if (word == delimiter)
 		{
@@ -103,11 +104,11 @@ void print_matrix(vector<string> data, vector<int> widths)
 	{
 		for (auto width : widths)
 		{
+			if (iter == data.end()) return;
 
 			if (iter->size() > width)
 			{
 				//asume number
-				cout << *iter << endl;
 				long double number = stold(to_cstring(*iter));
 				std::ostringstream mystream;
 				mystream << std::setprecision(5) << number;
@@ -209,7 +210,7 @@ public:
 	}
 	int listen()
 	{
-		printf("server: waiting for connections...\n");
+
 
 		while (1)   // main accept() loop
 		{
@@ -224,28 +225,9 @@ public:
 			inet_ntop(their_addr.ss_family,
 			          get_in_addr((struct sockaddr*)&their_addr),
 			          s, sizeof s);
-			printf("server: got connection from %s\n", s);
-			/*
-			if (!fork())   // this is the child process
-			{
-				//close(sock_fd_parent); // child doesn't need the listener
-				//added
-				cout << "inside fork" << endl;
-				if ((numbytes = recv(sock_fd_child, buf, MAXDATASIZE - 1, 0)) == -1)
-				{
-					perror("recv");
-					exit(1);
-					return 1;
-				}
-				buf[numbytes] = '\0';
-				printf("host: received '%s'\n", buf);
 
-				return numbytes;
-			}
-			*/
-			//close(sock_fd_parent); // child doesn't need the listener
-			//added
-			cout << "inside fork" << endl;
+
+
 			if ((numbytes = recv(sock_fd_child, buf, MAXDATASIZE - 1, 0)) == -1)
 			{
 				perror("recv");
@@ -253,7 +235,7 @@ public:
 				return 1;
 			}
 			buf[numbytes] = '\0';
-			printf("host: received '%s'\n", buf);
+			//printf("host: received '%s'\n", buf);
 
 			return numbytes;
 			close(sock_fd_child);  // parent doesn't need this
@@ -309,7 +291,7 @@ public:
 	map<string, addrinfo*> addresses;
 	UDP()
 	{
-		cout << "enter UDP init" << endl;
+
 		memset(&this->hints, 0, sizeof this->hints);
 		this->hints.ai_family = AF_INET;
 		this->hints.ai_socktype = SOCK_DGRAM;
@@ -357,7 +339,7 @@ public:
 		addresses.insert({"A", A_address});
 		addresses.insert({"B", B_address});
 		addresses.insert({"me", my_address});
-		cout << "exit udp_init" << endl;
+
 
 	}
 	int send(string server_ID, int message_size)
@@ -402,7 +384,7 @@ public:
 		printf("listener: packet is %d bytes long\n", numbytes);
 		buf[numbytes] = '\0';
 		printf("listener: packet contains \"%s\"\n", buf);
-		cout << "exit udp listen" << endl;
+
 		return numbytes;
 	}
 
@@ -452,29 +434,32 @@ int main()
 		cout << "The AWS has sent path length, propagatin speed and transmission speed" << endl;
 		cout << "to server B using UDP over port " << SERVERB << endl;
 		message_size = udp.recieve();
-		cout << "The AWS has recieved delays from server B" << endl;
-		cout << "-----------------------------------------" << endl;
-		cout << "Destination      Tt      Tp      Delay   " << endl;
-		cout << "-----------------------------------------" << endl;
+		cout << "The client has recieved the results form AWS:" << endl;
+		cout << "-----------------------------------------------------------" << endl;
+		cout << "Destination    Min Length    Tt        Tp       Delay      " << endl;
+		cout << "-----------------------------------------------------------" << endl;
 		widths.clear();
-		widths.push_back(string("Destination      ").size());
-		widths.push_back(string("Tt      ").size());
-		widths.push_back(string("Tp      ").size());
-		widths.push_back(string("Delay   ").size());
+		widths.push_back(string("Destination    ").size());
+		widths.push_back(string("Min Length    ").size());
+		widths.push_back(string("Tt        ").size());
+		widths.push_back(string("Tp       ").size());
+		widths.push_back(string("Delay      ").size());
 		input = delimit(from_cstring(buf), ' ');
-		input = vector<string>(input.begin() + 6, input.end());
+		input = vector<string>(input.begin() + 5, input.end());
 		count = 0;
+		/*
 		for (vector<string>::iterator it = input.begin(); it != input.end(); ++it)
 		{
 			if (count % 5 == 1) input.erase(it);
 			count++;
 		}
+		*/
 		print_matrix(input, widths);
 		cout << "-----------------------------------------" << endl;
-		cout << "The AWS has sent calculated dleay to client using TCP over port %s\n" << MYPORT << endl;
+		cout << "The AWS has sent calculated dleay to client using TCP over port" << MYPORT << endl;
 
 		if (tcp.talk(message_size)) {}
-		cout << "The AWS has sent calculated dleay to client using TCP over port %s\n" << MYPORT << endl;
+		cout << "The AWS has sent calculated dleay to client using TCP over port" << MYPORT << endl;
 		tcp.block();
 	}
 

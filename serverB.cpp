@@ -97,7 +97,6 @@ void print_matrix(vector<string> data, vector<int> widths)
 			if (iter->size() > width)
 			{
 				//asume number
-				cout << *iter << endl;
 				long double number = stold(to_cstring(*iter));
 				std::ostringstream mystream;
 				mystream << std::setprecision(5) << number;
@@ -254,7 +253,7 @@ public:
 	map<string, addrinfo*> addresses;
 	UDP()
 	{
-		cout << "enter UDP init" << endl;
+
 		memset(&this->hints, 0, sizeof this->hints);
 		this->hints.ai_family = AF_INET;
 		this->hints.ai_socktype = SOCK_DGRAM;
@@ -296,7 +295,7 @@ public:
 		}
 		addresses.insert({"me", my_address});
 		addresses.insert({"aws", AWS_address});
-		cout << "exit udp_init" << endl;
+
 
 	}
 	int send(string server_ID, char* message, int message_size)
@@ -313,7 +312,6 @@ public:
 		}
 
 
-		printf("talker: sent %d bytes to %s\n", numbytes, MYIPADDRESS);
 		return 0;
 	}
 	int recieve()
@@ -332,15 +330,19 @@ public:
 			exit(1);
 			return 1;
 		}
+		/*
 
 		printf("listener: got packet from %s\n",
 		       inet_ntop(their_addr.ss_family,
 		                 get_in_addr((struct sockaddr*)&their_addr),
 		                 s, sizeof s));
 		printf("listener: packet is %d bytes long\n", numbytes);
-		buf[numbytes] = '\0';
+
 		printf("listener: packet contains \"%s\"\n", buf);
 		cout << "exit udp listen" << endl;
+		*/
+
+		buf[numbytes] = '\0';
 		return 0;
 	}
 
